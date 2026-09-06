@@ -42,7 +42,9 @@ TYPES = list(CHART)
 
 # 既定の設定（docs/SPEC.md §4 の DEFAULT_SETTINGS に対応）
 DEFAULT_BONUS = 20        # ばつぐんボーナス
-DEFAULT_MEGA = 1 / 3      # メガシンカ発動ライン
+# メガシンカ発動ライン。小数にすると 300 x (1/3) が 99.999... になり
+# ちょうど 1/3 のときに発動しなくなるため、分数 (分子, 分母) で持つ
+DEFAULT_MEGA = (1, 3)
 DEFAULT_FATIGUE = True    # つかれルール
 
 ENERGY_MIN, ENERGY_MAX = 150, 350
@@ -110,7 +112,8 @@ def battle(multiplier, size, bonus=DEFAULT_BONUS, mega=DEFAULT_MEGA,
         target['hp'] = max(0, target['hp'] - damage)
         # ダメージ適用後に、受けた側のメガシンカを判定する（ひんしなら発動しない）
         if (mega is not None and target['can_mega'] and not target['mega']
-                and 0 < target['hp'] <= target['max'] * mega):
+                and target['hp'] > 0
+                and target['hp'] * mega[1] <= target['max'] * mega[0]):
             target['mega'] = True
 
         side = 1 - side
@@ -127,7 +130,8 @@ def _stats(**kwargs):
 def main():
     rate = sum(1 for a in TYPES for b in TYPES if b in CHART[a]) / len(TYPES) ** 2
     print(f"こうかばつぐん発生率: {rate:.1%}（ランダムなタイプ同士の場合）")
-    print(f"既定の設定: ばつぐん +{DEFAULT_BONUS} / メガシンカ {DEFAULT_MEGA:.0%} 以下 / "
+    print(f"既定の設定: ばつぐん +{DEFAULT_BONUS} / "
+          f"メガシンカ {DEFAULT_MEGA[0]}/{DEFAULT_MEGA[1]} 以下 / "
           f"つかれ {'あり' if DEFAULT_FATIGUE else 'なし'}\n")
 
     print("■ ダメージばいりつ別の所要時間（既定の設定・交代して戦う場合）")
@@ -153,7 +157,7 @@ def main():
               f"+{DEFAULT_BONUS} は +{DEFAULT_BONUS / avg:.0%}")
 
     print("\n■ メガシンカ発動ライン別の所要時間（ばいりつ x20・3vs3）")
-    for label, ratio in (('1/2', 1 / 2), ('1/3', 1 / 3), ('1/4', 1 / 4), ('つかわない', None)):
+    for label, ratio in (('1/2', (1, 2)), ('1/3', (1, 3)), ('1/4', (1, 4)), ('つかわない', None)):
         mean, worst = _stats(multiplier=20, size=3, mega=ratio)
         print(f"  {label:<10}: 平均{mean:5.1f}ターン (最大{worst:3d}) "
               f"約{mean * SECONDS_PER_TURN / 60:4.1f}分")

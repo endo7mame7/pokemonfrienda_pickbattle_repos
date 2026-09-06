@@ -1,0 +1,295 @@
+import { describe, expect, it } from 'vitest';
+import {
+  battleReducer,
+  createBattle,
+  diceCountForTurn,
+  isAlive,
+  isTeamWipedOut,
+  mvpOf,
+  selectedAttacker,
+  type BattleAction,
+  type BattleState,
+} from '../battle';
+import { OPPONENT_OF } from '../types';
+import { makePick, makeSettings } from './testHelpers';
+
+const settings = makeSettings({ damageMultiplier: 20, superEffectiveBonus: 20 });
+
+function apply(state: BattleState, ...actions: BattleAction[]): BattleState {
+  return actions.reduce(battleReducer, state);
+}
+
+/** 攻撃を1回だけ最後まで進める（phase は resolve で止まる） */
+function attack(state: BattleState, attackerIndex: number, targetIndex: number, rolls: number[]) {
+  return apply(
+    state,
+    { type: 'selectAttacker', index: attackerIndex },
+    { type: 'selectTarget', index: targetIndex },
+    { type: 'rollDice', rolls },
+  );
+}
+
+/** resolve から相手のターンへ進める */
+function handOff(state: BattleState): BattleState {
+  return apply(state, { type: 'next' }, { type: 'next' });
+}
+
+/** 相手に軽く1回攻撃させて、手番を自分に戻す */
+function opponentTurn(state: BattleState): BattleState {
+  const afterHandOff = handOff(state);
+  const attackerIndex = afterHandOff.teams[afterHandOff.turnPlayer].findIndex(isAlive);
+  const targetIndex = afterHandOff.teams[OPPONENT_OF[afterHandOff.turnPlayer]].findIndex(isAlive);
+  const withSelection = apply(
+    afterHandOff,
+    { type: 'selectAttacker', index: attackerIndex },
+    { type: 'selectTarget', index: targetIndex },
+  );
+  const rolls = Array.from({ length: diceCountForTurn(withSelection) }, () => 1);
+  return handOff(battleReducer(withSelection, { type: 'rollDice', rolls }));
+}
+
+describe('バトルの進行', () => {
+  it('コイントスで決まったプレイヤーから始まる', () => {
+    const state = createBattle([makePick()], [makePick()], 'p2', settings);
+    expect(state.turnPlayer).toBe('p2');
+    expect(state.phase).toBe('selectAttacker');
+    expect(state.turnCount).toBe(1);
+  });
+
+  it('こうげきする子 → ねらう子 → サイコロ の順に進む', () => {
+    let state = createBattle([makePick()], [makePick()], 'p1', settings);
+    state = battleReducer(state, { type: 'selectAttacker', index: 0 });
+    expect(state.phase).toBe('selectTarget');
+    state = battleReducer(state, { type: 'selectTarget', index: 0 });
+    expect(state.phase).toBe('rollDice');
+    state = battleReducer(state, { type: 'rollDice', rolls: [3] });
+    expect(state.phase).toBe('resolve');
+  });
+
+  it('サイコロを振るまでは選択をやり直せる（U-6）', () => {
+    let state = createBattle([makePick(), makePick()], [makePick()], 'p1', settings);
+    state = apply(
+      state,
+      { type: 'selectAttacker', index: 0 },
+      { type: 'selectTarget', index: 0 },
+      { type: 'clearSelection' },
+    );
+    expect(state.phase).toBe('selectAttacker');
+    expect(state.selectedAttackerIndex).toBeNull();
+    expect(state.selectedTargetIndex).toBeNull();
+  });
+
+  it('攻撃する子を選び直せる', () => {
+    let state = createBattle([makePick(), makePick()], [makePick()], 'p1', settings);
+    state = apply(
+      state,
+      { type: 'selectAttacker', index: 0 },
+      { type: 'selectAttacker', index: 1 },
+    );
+    expect(state.selectedAttackerIndex).toBe(1);
+  });
+
+  it('ダメージが相手のたいりょくから引かれる', () => {
+    const state = attack(
+      createBattle([makePick()], [makePick({ energy: 200 })], 'p1', settings),
+      0,
+      0,
+      [3],
+    );
+    expect(state.teams.p2[0]!.hp).toBe(140); // 200 - 60
+    expect(state.lastResult?.damage).toBe(60);
+  });
+
+  it('たいりょくはマイナスにならない', () => {
+    const state = attack(
+      createBattle([makePick()], [makePick({ energy: 100 })], 'p1', settings),
+      0,
+      0,
+      [6],
+    );
+    expect(state.teams.p2[0]!.hp).toBe(0);
+    expect(state.lastResult?.targetFainted).toBe(true);
+  });
+
+  it('攻撃が終わると相手に手番が渡る', () => {
+    let state = attack(createBattle([makePick()], [makePick()], 'p1', settings), 0, 0, [1]);
+    state = battleReducer(state, { type: 'next' });
+    expect(state.phase).toBe('handOff');
+    state = battleReducer(state, { type: 'next' });
+    expect(state.turnPlayer).toBe('p2');
+    expect(state.turnCount).toBe(2);
+    expect(state.phase).toBe('selectAttacker');
+  });
+
+  it('ひんしのポケモンは攻撃にも攻撃対象にも選べない', () => {
+    let state = createBattle([makePick()], [makePick({ energy: 10 }), makePick()], 'p1', settings);
+    state = handOff(attack(state, 0, 0, [6])); // p2 の1体目をたおして p2 の手番へ
+    expect(state.teams.p2[0]!.hp).toBe(0);
+    expect(state.turnPlayer).toBe('p2');
+
+    // ひんしのポケモンでは攻撃できない
+    expect(battleReducer(state, { type: 'selectAttacker', index: 0 }).selectedAttackerIndex).toBeNull();
+    // 生きている子は選べる
+    state = battleReducer(state, { type: 'selectAttacker', index: 1 });
+    expect(state.selectedAttackerIndex).toBe(1);
+
+    // p1 の手番に戻すと、たおした相手はもう狙えない
+    state = handOff(battleReducer(battleReducer(state, { type: 'selectTarget', index: 0 }), {
+      type: 'rollDice',
+      rolls: [1],
+    }));
+    expect(state.turnPlayer).toBe('p1');
+    const afterTarget = apply(
+      state,
+      { type: 'selectAttacker', index: 0 },
+      { type: 'selectTarget', index: 0 },
+    );
+    expect(afterTarget.selectedTargetIndex).toBeNull();
+  });
+
+  it('相手が全滅したら勝ち', () => {
+    let state = attack(
+      createBattle([makePick()], [makePick({ energy: 10 })], 'p1', settings),
+      0,
+      0,
+      [6],
+    );
+    state = battleReducer(state, { type: 'next' });
+    expect(state.phase).toBe('finished');
+    expect(state.winner).toBe('p1');
+  });
+
+  it('メガシンカ中はサイコロが2個になる', () => {
+    // つかれでダメージが半減すると発動ラインの検証がぼやけるので、ここでは切っておく
+    let state = createBattle(
+      [makePick()],
+      [makePick({ energy: 300, canMegaEvolve: true })],
+      'p1',
+      makeSettings({ damageMultiplier: 20, fatigueEnabled: false }),
+    );
+    expect(diceCountForTurn(state)).toBe(1);
+
+    // 300 → 100（1/3以下）でメガシンカ
+    state = opponentTurn(attack(state, 0, 0, [5])); // 100ダメージ → hp 200
+    state = attack(state, 0, 0, [5]); // hp 100 → メガシンカ発動
+    expect(state.teams.p2[0]!.megaEvolved).toBe(true);
+    expect(state.lastResult?.megaEvolvedNames).toEqual([state.teams.p2[0]!.name]);
+
+    // メガシンカした p2 の手番では、サイコロが2個になる
+    state = handOff(state);
+    expect(state.turnPlayer).toBe('p2');
+    state = battleReducer(state, { type: 'selectAttacker', index: 0 });
+    expect(selectedAttacker(state)?.megaEvolved).toBe(true);
+    expect(diceCountForTurn(state)).toBe(2);
+  });
+
+  it('たいりょくが ちょうど 1/3 のときも メガシンカする', () => {
+    const state = attack(
+      createBattle(
+        [makePick()],
+        [makePick({ energy: 300, canMegaEvolve: true })],
+        'p1',
+        makeSettings({ damageMultiplier: 20, fatigueEnabled: false }),
+      ),
+      0,
+      0,
+      [5, 5], // 200ダメージ → hp 100 = 300 の ちょうど 1/3
+    );
+    expect(state.teams.p2[0]!.hp).toBe(100);
+    expect(state.teams.p2[0]!.megaEvolved).toBe(true);
+  });
+
+  it('つかれた状態で攻撃するとダメージが半分になる', () => {
+    let state = createBattle([makePick()], [makePick({ energy: 350 })], 'p1', settings);
+    state = attack(state, 0, 0, [3]); // 全力 60
+    expect(state.lastResult?.damage).toBe(60);
+    expect(state.teams.p1[0]!.tired).toBe(true);
+
+    state = opponentTurn(state);
+    state = attack(state, 0, 0, [3]); // つかれて 30
+    expect(state.lastResult?.damage).toBe(30);
+    expect(state.lastResult?.isTired).toBe(true);
+    expect(state.teams.p1[0]!.tired).toBe(false); // 攻撃後は元気に戻る
+  });
+
+  it('MVP はいちばん多くダメージを与えた子', () => {
+    let state = createBattle(
+      [makePick({ name: 'A' }), makePick({ name: 'B' })],
+      [makePick({ energy: 350 })],
+      'p1',
+      settings,
+    );
+    state = opponentTurn(attack(state, 0, 0, [2])); // A: 40
+    state = attack(state, 1, 0, [5]); // B: 100
+    expect(mvpOf(state.teams.p1)?.name).toBe('B');
+  });
+});
+
+describe('1バトルを最後まで完走できる（P0の完了条件）', () => {
+  /** 再現可能な擬似乱数（テストが毎回同じ結果になるように） */
+  function makeRng(seed: number) {
+    let value = seed;
+    return () => {
+      value = (value * 1664525 + 1013904223) % 4294967296;
+      return value / 4294967296;
+    };
+  }
+
+  function playToEnd(seed: number, teamSize: number) {
+    const rng = makeRng(seed);
+    const rollDie = () => Math.floor(rng() * 6) + 1;
+    const makeTeam = () =>
+      Array.from({ length: teamSize }, () =>
+        makePick({
+          energy: (Math.floor(rng() * 21) + 15) * 10,
+          canMegaEvolve: rng() < 0.4,
+        }),
+      );
+
+    let state = createBattle(makeTeam(), makeTeam(), 'p1', settings);
+    let guard = 0;
+
+    while (state.phase !== 'finished') {
+      guard += 1;
+      if (guard > 500) throw new Error('バトルが終わらない');
+
+      if (state.phase === 'selectAttacker') {
+        const team = state.teams[state.turnPlayer];
+        // つかれていない子を優先して選ぶ（交代して戦う）
+        const fresh = team.findIndex((p) => isAlive(p) && !p.tired);
+        const index = fresh >= 0 ? fresh : team.findIndex(isAlive);
+        state = battleReducer(state, { type: 'selectAttacker', index });
+      } else if (state.phase === 'selectTarget') {
+        const index = state.teams[OPPONENT_OF[state.turnPlayer]].findIndex(isAlive);
+        state = battleReducer(state, { type: 'selectTarget', index });
+      } else if (state.phase === 'rollDice') {
+        const rolls = Array.from({ length: diceCountForTurn(state) }, rollDie);
+        state = battleReducer(state, { type: 'rollDice', rolls });
+      } else {
+        state = battleReducer(state, { type: 'next' });
+      }
+    }
+    return state;
+  }
+
+  it.each([1, 2, 3])('%ivs%i が決着する', (teamSize) => {
+    for (let seed = 1; seed <= 20; seed += 1) {
+      const state = playToEnd(seed, teamSize);
+      expect(state.winner).not.toBeNull();
+      expect(isTeamWipedOut(state.teams[OPPONENT_OF[state.winner!]])).toBe(true);
+      // 勝った側は1体以上生き残っている
+      expect(state.teams[state.winner!].some(isAlive)).toBe(true);
+      // たいりょくが負になっていない
+      for (const team of [state.teams.p1, state.teams.p2]) {
+        for (const pokemon of team) expect(pokemon.hp).toBeGreaterThanOrEqual(0);
+      }
+    }
+  });
+
+  it('3vs3 のターン数がバランス検証の想定（平均21ターン前後）に収まる', () => {
+    const turnCounts = Array.from({ length: 60 }, (_, i) => playToEnd(i + 100, 3).turnCount);
+    const average = turnCounts.reduce((a, b) => a + b, 0) / turnCounts.length;
+    expect(average).toBeGreaterThan(14);
+    expect(average).toBeLessThan(28);
+  });
+});

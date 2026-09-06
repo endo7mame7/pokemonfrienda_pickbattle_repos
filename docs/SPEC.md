@@ -166,6 +166,7 @@
 - 条件がたいりょくの割合だけなので、園児が能動的に判断・操作する必要がない。
 - たいりょく300のポケモンなら、1/3設定で残り100以下（＝あと1〜2発で倒れる）で発動する。ギリギリ感が出る。
 - 判定はダメージ適用の直後に行うため、**同じ攻撃でひんしになった場合はメガシンカしない**（0になったら発動せずに倒れる）。
+- **ちょうど 1/3（たいりょく300で残り100）でも発動する**。判定は小数を使わず整数の比較で行う（§8.3）。
 - 発動ラインを 1/2 にすると早めに発動して派手になり、1/4 にすると「ほぼ倒れる寸前」の大逆転演出になる。
 
 ### 3.7 つかれ（連続攻撃のペナルティ）
@@ -411,10 +412,16 @@ interface BattleState {
 /** §4 の設定。すべて settings テーブルに永続化する */
 type MegaThreshold = 'half' | 'third' | 'quarter' | 'off';
 
-const MEGA_THRESHOLD_RATIO: Record<MegaThreshold, number | null> = {
-  half: 1 / 2,
-  third: 1 / 3,
-  quarter: 1 / 4,
+/**
+ * 発動ラインは分数のまま持つ。小数にすると 300 × (1/3) が 99.999… になり、
+ * たいりょくが ちょうど 1/3 のときに発動しなくなるため。
+ */
+interface Fraction { numerator: number; denominator: number }
+
+const MEGA_THRESHOLD_RATIO: Record<MegaThreshold, Fraction | null> = {
+  half: { numerator: 1, denominator: 2 },
+  third: { numerator: 1, denominator: 3 },
+  quarter: { numerator: 1, denominator: 4 },
   off: null,
 };
 
@@ -487,10 +494,10 @@ function updateFatigue(team: BattlePokemon[], attacker: BattlePokemon, wasTired:
 function shouldMegaEvolve(p: BattlePokemon, settings: Settings): boolean {
   const ratio = MEGA_THRESHOLD_RATIO[settings.megaThreshold];
   if (ratio === null) return false;
-  return p.canMegaEvolve
-    && !p.megaEvolved
-    && p.hp > 0                     // ひんしになったら発動しない
-    && p.hp <= p.maxHp * ratio;
+  if (!p.canMegaEvolve || p.megaEvolved || p.hp <= 0) return false;  // ひんしなら発動しない
+
+  // hp <= maxHp × (numerator / denominator) を、小数を使わずに判定する
+  return p.hp * ratio.denominator <= p.maxHp * ratio.numerator;
 }
 ```
 
