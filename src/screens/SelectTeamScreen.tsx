@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Silhouette } from '../components/Silhouette';
 import type { Pick, PlayerId } from '../domain';
 import { TYPE_COLORS } from '../ui/typeColors';
 
@@ -45,13 +46,21 @@ export function SelectTeamScreen({ player, playerName, size, picks, onDecide, on
                 className={order >= 0 ? 'pick-item pick-item--selected' : 'pick-item'}
                 onClick={() => toggle(pick.id)}
               >
-                <div className="card__name">{pick.name}</div>
-                <div className="card__type" style={{ background: TYPE_COLORS[pick.type] }}>
-                  {pick.type}
+                <div className="pick-item__inner">
+                  <Silhouette
+          name={pick.name}
+          type={pick.type}
+          shape={pick.silhouette}
+          size={50}
+        />
+                  <div className="card__name">{pick.name}</div>
+                  <div className="card__type" style={{ background: TYPE_COLORS[pick.type] }}>
+                    {pick.type}
+                  </div>
+                  <div className="card__hp-text">{pick.energy}</div>
+                  {pick.canMegaEvolve && <div style={{ fontSize: 13 }}>🌈 メガシンカ</div>}
+                  {order >= 0 && <div className="pick-item__order">{order + 1}</div>}
                 </div>
-                <div className="card__hp-text">{pick.energy}</div>
-                {pick.canMegaEvolve && <div style={{ fontSize: 13 }}>🌈 メガシンカ</div>}
-                {order >= 0 && <div className="pick-item__order">{order + 1}</div>}
               </button>
             );
           })}

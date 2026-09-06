@@ -7,6 +7,16 @@ export const POKEMON_TYPES = [
 
 export type PokemonType = (typeof POKEMON_TYPES)[number];
 
+/**
+ * ポケモンの「かげ」の形。実在のイラストは著作権上つかえないため、
+ * 生きもののシルエットだけを見せる。登録するときに形を選べる。
+ */
+export const SILHOUETTE_SHAPES = [
+  'まる', 'よつあし', 'にそく', 'つばさ', 'へび', 'さかな', 'むし', 'おばけ',
+] as const;
+
+export type SilhouetteShape = (typeof SILHOUETTE_SHAPES)[number];
+
 /** ずかんに登録された1枚のピック */
 export interface Pick {
   id: string;
@@ -15,6 +25,8 @@ export interface Pick {
   /** エネルギー値。そのまま初期たいりょくになる（150〜350程度） */
   energy: number;
   canMegaEvolve: boolean;
+  /** かげの形。指定しないときは名前から自動できめる */
+  silhouette?: SilhouetteShape;
   /** 実物ピックの写真（長辺512pxに縮小して保存する） */
   photo?: Blob;
   /** 使用回数。ずかんの「よくつかう順」に使う */
@@ -32,6 +44,7 @@ export interface BattlePokemon {
   /** 0 になったら ひんし */
   hp: number;
   canMegaEvolve: boolean;
+  silhouette?: SilhouetteShape;
   megaEvolved: boolean;
   /** 全力で攻撃した次のターン。ダメージが半分になる */
   tired: boolean;

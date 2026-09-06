@@ -32,7 +32,7 @@ const tap = async (text) => { await page.getByText(text, { exact: false }).first
 await page.goto('http://localhost:4173/');
 await shot('01-title');
 
-await tap('ばとるを はじめる');
+await tap('バトルを はじめる');
 await shot('02-teamsize');
 
 const SIZE = Number(process.env.TEAM_SIZE ?? 3);
@@ -54,13 +54,14 @@ await shot('04-cointoss');
 await page.getByText('モンスターボール').click();
 await page.waitForTimeout(1500);
 await shot('05-cointoss-result');
-await page.getByText('ばとる スタート').click();
+await page.getByText('バトル スタート').click();
 
 await shot('06-battle-start');
 
 // バトルを最後まで自動で進める
 let turns = 0;
 let sawSuperEffective = false, sawTired = false, sawMega = false, shotBattle = false;
+let shotMegaPrompt = false, shotMegaAnim = false;
 while (turns < 400) {
   turns += 1;
   const body = await page.locator('body').innerText();
@@ -68,10 +69,18 @@ while (turns < 400) {
   if (body.includes('の かち！')) break;
 
   if (body.includes('つかれてるよ')) { await page.getByText('これで いく').click(); continue; }
+  if (body.includes('メガシンカ できる！')) {
+    if (!shotMegaPrompt) { await shot('07-mega-prompt'); shotMegaPrompt = true; }
+    await page.getByText('メガシンカ する！').click();
+    sawMega = true;
+    await page.waitForTimeout(1900);
+    if (!shotMegaAnim) { await shot('08-mega-anim'); shotMegaAnim = true; }
+    await page.waitForTimeout(1000);
+    continue;
+  }
   if (body.includes('スマホを わたしてね')) { await page.getByText('じゅんび できた').click(); continue; }
   if (body.includes('ばつぐん！')) sawSuperEffective = true;
   if (body.includes('つかれて はんぶん')) sawTired = true;
-  if (body.includes('メガシンカ！')) { sawMega = true; if (!shotBattle) { await shot('07-mega'); shotBattle = true; } }
 
   if (body.includes('だれで こうげきする')) {
     const cards = page.locator('.card--selectable');
@@ -90,7 +99,7 @@ while (turns < 400) {
   await page.waitForTimeout(120);
 }
 
-await shot('08-result');
+await shot('09-result');
 const finalBody = await page.locator('body').innerText();
 
 // 横スクロールが出ていないこと（画面がはみ出していないこと）

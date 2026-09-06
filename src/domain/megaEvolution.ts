@@ -2,9 +2,10 @@ import { MEGA_THRESHOLD_RATIO } from './types';
 import type { BattlePokemon, Settings } from './types';
 
 /**
- * メガシンカの発動判定（docs/SPEC.md §3.6）。
- * ダメージ適用の直後に、攻撃を受けた側の全ポケモンについて判定する。
- * ひんしになった場合は発動しない。
+ * メガシンカ できる状態かどうか（docs/SPEC.md §3.6）。
+ * 条件を満たしても自動では発動しない。自分のターンのはじめに
+ * 「メガシンカする？」と聞き、プレイヤーが選ぶ。
+ * ひんしになった場合は発動できない。
  */
 export function shouldMegaEvolve(pokemon: BattlePokemon, settings: Settings): boolean {
   const ratio = MEGA_THRESHOLD_RATIO[settings.megaThreshold];
@@ -15,14 +16,14 @@ export function shouldMegaEvolve(pokemon: BattlePokemon, settings: Settings): bo
   return pokemon.hp * ratio.denominator <= pokemon.maxHp * ratio.numerator;
 }
 
-/** 発動条件を満たしたポケモンをメガシンカさせ、対象を返す */
-export function applyMegaEvolution(
+/**
+ * メガシンカできるポケモンを1体さがす。自分のターンのはじめに呼び、
+ * 見つかったら「メガシンカする？」とプレイヤーに聞く。
+ */
+export function findMegaCandidateIndex(
   team: BattlePokemon[],
   settings: Settings,
-): BattlePokemon[] {
-  const evolved = team.filter((pokemon) => shouldMegaEvolve(pokemon, settings));
-  for (const pokemon of evolved) {
-    pokemon.megaEvolved = true;
-  }
-  return evolved;
+): number | null {
+  const index = team.findIndex((pokemon) => shouldMegaEvolve(pokemon, settings));
+  return index === -1 ? null : index;
 }

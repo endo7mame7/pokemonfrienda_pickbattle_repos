@@ -1,6 +1,7 @@
 import { useEffect, useReducer, useState } from 'react';
 import { Dice } from '../components/Dice';
 import { PokemonCard } from '../components/PokemonCard';
+import { Silhouette } from '../components/Silhouette';
 import {
   battleReducer,
   createBattle,
@@ -23,6 +24,7 @@ interface Props {
 }
 
 const ROLL_ANIMATION_MS = 700;
+const MEGA_ANIMATION_MS = 2400;
 
 export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFinish }: Props) {
   const [state, dispatch] = useReducer(
@@ -38,11 +40,20 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
     if (state.phase === 'finished') onFinish(state);
   }, [state, onFinish]);
 
+  // メガシンカの演出は、見せてから自動で次に進む
+  useEffect(() => {
+    if (state.phase !== 'megaEvolving') return undefined;
+    const timer = window.setTimeout(() => dispatch({ type: 'next' }), MEGA_ANIMATION_MS);
+    return () => window.clearTimeout(timer);
+  }, [state.phase]);
+
   const me = state.turnPlayer;
   const foe = OPPONENT_OF[me];
   const myTeam = state.teams[me];
   const foeTeam = state.teams[foe];
   const result = state.lastResult;
+  const megaCandidate =
+    state.megaCandidateIndex === null ? null : (myTeam[state.megaCandidateIndex] ?? null);
 
   const chooseAttacker = (index: number) => {
     const pokemon = myTeam[index];
@@ -129,11 +140,6 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
                   </span>
                 )}
                 {result.isTired && <span className="badge badge--tired">💤 つかれて はんぶん</span>}
-                {result.megaEvolvedNames.map((name) => (
-                  <span key={name} className="badge badge--mega">
-                    🌈 {name}が メガシンカ！
-                  </span>
-                ))}
               </div>
               <div className="damage">-{result.damage}</div>
               <div className="tap-hint">タップして つぎへ 👆</div>
@@ -194,6 +200,50 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
               ほかの子に する
             </button>
           </div>
+        </div>
+      )}
+
+      {state.phase === 'megaPrompt' && megaCandidate && (
+        <div className="overlay">
+          <div className="overlay__panel">
+            <Silhouette
+              name={megaCandidate.name}
+              type={megaCandidate.type}
+              size={92}
+              key={megaCandidate.name}
+            />
+            <div className="overlay__title" style={{ fontSize: 22 }}>
+              {megaCandidate.name}は メガシンカ できる！
+            </div>
+            <p style={{ margin: 0 }}>メガシンカ すると サイコロが 2こに なるよ</p>
+            <button type="button" className="btn" onClick={() => dispatch({ type: 'megaEvolve' })}>
+              🌈 メガシンカ する！
+            </button>
+            <button
+              type="button"
+              className="btn btn--ghost"
+              onClick={() => dispatch({ type: 'declineMega' })}
+            >
+              いまは しない
+            </button>
+          </div>
+        </div>
+      )}
+
+      {state.phase === 'megaEvolving' && megaCandidate && (
+        <div className="overlay">
+          <div className="mega-stage">
+            <div className="mega-stage__glow">
+              <div className="mega-stage__figure">
+                <Silhouette name={megaCandidate.name} type={megaCandidate.type} size={110} />
+              </div>
+            </div>
+            <div className="mega-stage__title">🌈 メガシンカ！</div>
+            <div className="tap-hint" style={{ color: '#fff' }}>
+              {megaCandidate.name}の サイコロが 2こに なった！
+            </div>
+          </div>
+          <div className="mega-flash" />
         </div>
       )}
 

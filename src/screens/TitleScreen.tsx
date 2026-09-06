@@ -10,7 +10,7 @@ export function TitleScreen({ onStart }: Props) {
         <h1 className="title">ピックバトル</h1>
         <p className="subtitle">ピックを えらんで たたかおう！</p>
         <button type="button" className="btn btn--big" onClick={onStart}>
-          ばとるを はじめる
+          バトルを はじめる
         </button>
       </div>
     </div>
