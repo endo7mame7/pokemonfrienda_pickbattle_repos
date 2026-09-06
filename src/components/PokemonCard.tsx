@@ -1,6 +1,6 @@
 import type { BattlePokemon } from '../domain';
 import { TYPE_COLORS } from '../ui/typeColors';
-import { Silhouette } from './Silhouette';
+import { PokemonFace } from './PokemonFace';
 
 interface Props {
   pokemon: BattlePokemon;
@@ -47,9 +47,10 @@ export function PokemonCard({ pokemon, selectable, selected, dimmed, onSelect }:
           {!fainted && pokemon.megaEvolved && '🌈'}
           {!fainted && pokemon.tired && '💤'}
         </div>
-        <Silhouette
+        <PokemonFace
           name={pokemon.name}
           type={pokemon.type}
+          photo={pokemon.photo}
           shape={pokemon.silhouette}
           size={40}
         />

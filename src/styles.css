@@ -419,6 +419,8 @@ body {
   /* button は中身のたかさを行のサイズに伝えないので、行を中身に合わせる */
   grid-auto-rows: max-content;
   gap: 10px;
+  /* あまった高さをここが受けもち、下のボタンを画面の下に置く */
+  flex: 1;
   overflow-y: auto;
   min-height: 0;
   padding-bottom: 4px;
@@ -604,4 +606,209 @@ body {
   .coin--spinning {
     animation: none;
   }
+}
+
+/* --- タイトルのモードえらび --- */
+.mode {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mode--sub {
+  background: #6b8f3f;
+}
+
+.mode__hint {
+  font-size: 15px;
+  font-weight: 500;
+  opacity: 0.9;
+}
+
+/* --- ずかん・とうろくフォーム --- */
+.form {
+  overflow-y: auto;
+  gap: 18px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.field__label {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+
+.hint {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ink-soft);
+}
+
+.hint--error {
+  color: var(--hp-bad);
+  font-weight: 700;
+}
+
+.text-input {
+  width: 100%;
+  min-height: 56px;
+  padding: 10px 14px;
+  border: 3px solid #d5dce6;
+  border-radius: var(--radius);
+  background: var(--panel);
+  font: inherit;
+  font-size: 20px;
+  color: inherit;
+}
+
+.text-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.photo-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.photo-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 108px;
+  height: 108px;
+  flex: none;
+  border-radius: var(--radius);
+  border: 3px dashed #cbd5e1;
+  background: var(--panel);
+  overflow: hidden;
+}
+
+.photo-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.photo-actions .btn {
+  font-size: 19px;
+  padding: 10px 12px;
+}
+
+.photo-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.face-photo {
+  border-radius: 10px;
+  object-fit: cover;
+  display: block;
+}
+
+/* えらぶボタンの列 */
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  min-height: 48px;
+  padding: 8px 16px;
+  border: 3px solid #d5dce6;
+  border-radius: 999px;
+  background: var(--panel);
+  font: inherit;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.chip--on {
+  border-color: var(--accent);
+  background: #eaf2fd;
+  color: var(--accent);
+}
+
+.type-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.type-chip {
+  min-height: 52px;
+  border: 4px solid transparent;
+  border-radius: 12px;
+  color: #fff;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  opacity: 0.5;
+  cursor: pointer;
+}
+
+.type-chip--on {
+  opacity: 1;
+  border-color: var(--ink);
+}
+
+.shape-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.shape-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 2px;
+  border: 3px solid transparent;
+  border-radius: 12px;
+  background: var(--panel);
+  font: inherit;
+  font-size: 12px;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.shape-chip--on {
+  border-color: var(--accent);
+  background: #eaf2fd;
+}
+
+.toggle {
+  min-height: 64px;
+  border: 3px solid #d5dce6;
+  border-radius: var(--radius);
+  background: var(--panel);
+  font: inherit;
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.toggle--on {
+  border-color: #b06bd8;
+  background: #fbeeff;
+  color: #6b2f8c;
+}
+
+.btn--danger {
+  background: var(--hp-bad);
 }

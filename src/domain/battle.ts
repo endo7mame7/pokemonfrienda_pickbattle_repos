@@ -64,6 +64,7 @@ export function toBattlePokemon(pick: Pick): BattlePokemon {
     hp: pick.energy,
     canMegaEvolve: pick.canMegaEvolve,
     ...(pick.silhouette ? { silhouette: pick.silhouette } : {}),
+    ...(pick.photo ? { photo: pick.photo } : {}),
     megaEvolved: false,
     tired: false,
     damageDealt: 0,

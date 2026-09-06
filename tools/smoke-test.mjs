@@ -32,8 +32,15 @@ const tap = async (text) => { await page.getByText(text, { exact: false }).first
 await page.goto('http://localhost:4173/');
 await shot('01-title');
 
-await tap('バトルを はじめる');
-await shot('02-teamsize');
+// はじめて起動したときは ずかんが からっぽなので、みほんを入れておく
+await page.locator('.mode--sub').click();
+await page.getByText('とりあえず ためしたい').click();
+await page.getByText('みほんの 12たいを いれる').click();
+await shot('02-pickbook');
+await page.getByText('もどる').click();
+
+await page.locator('.mode').first().click();
+await shot('03-teamsize');
 
 const SIZE = Number(process.env.TEAM_SIZE ?? 3);
 await page.getByText(`${SIZE}たい${SIZE}`).click();
@@ -41,7 +48,7 @@ await page.getByText(`${SIZE}たい${SIZE}`).click();
 for (const name of ['リザードン', 'ピカチュウ', 'カビゴン'].slice(0, SIZE)) {
   await page.getByText(name, { exact: true }).click();
 }
-await shot('03-selectteam');
+await shot('04-selectteam');
 await page.getByText('けってい').click();
 
 await tap('じゅんび できた');
@@ -50,13 +57,13 @@ for (const name of ['フシギバナ', 'ゲンガー', 'ギャラドス'].slice(
 }
 await page.getByText('けってい').click();
 
-await shot('04-cointoss');
+await shot('05-cointoss');
 await page.getByText('モンスターボール').click();
 await page.waitForTimeout(1500);
-await shot('05-cointoss-result');
+await shot('06-cointoss-result');
 await page.getByText('バトル スタート').click();
 
-await shot('06-battle-start');
+await shot('07-battle-start');
 
 // バトルを最後まで自動で進める
 let turns = 0;
@@ -70,11 +77,11 @@ while (turns < 400) {
 
   if (body.includes('つかれてるよ')) { await page.getByText('これで いく').click(); continue; }
   if (body.includes('メガシンカ できる！')) {
-    if (!shotMegaPrompt) { await shot('07-mega-prompt'); shotMegaPrompt = true; }
+    if (!shotMegaPrompt) { await shot('09-mega-prompt'); shotMegaPrompt = true; }
     await page.getByText('メガシンカ する！').click();
     sawMega = true;
     await page.waitForTimeout(1900);
-    if (!shotMegaAnim) { await shot('08-mega-anim'); shotMegaAnim = true; }
+    if (!shotMegaAnim) { await shot('10-mega-anim'); shotMegaAnim = true; }
     await page.waitForTimeout(1000);
     continue;
   }
@@ -88,7 +95,7 @@ while (turns < 400) {
     continue;
   }
   if (body.includes('だれを ねらう')) {
-    if (!shotBattle) { await shot('07-battle-select'); }
+    if (!shotBattle) { await shot('08-battle-select'); }
     const cards = page.locator('.card--selectable');
     await cards.first().click({ force: true });
     continue;
@@ -99,7 +106,7 @@ while (turns < 400) {
   await page.waitForTimeout(120);
 }
 
-await shot('09-result');
+await shot('11-result');
 const finalBody = await page.locator('body').innerText();
 
 // 横スクロールが出ていないこと（画面がはみ出していないこと）
