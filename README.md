@@ -1,2 +1,79 @@
-# pokemonfrienda_pickbattle_repos
-ポケモンフレンダのピックを使った対戦アプリ。
+# ポケモンフレンダ ピックバトル
+
+ポケモンフレンダの「ピック」に書かれた **ポケモン名 / タイプ / エネルギー値** だけを使って遊ぶ、
+幼稚園児でも自分で遊べるデジタル・ポケモンバトルアプリ。
+
+**親の iPhone 1台**を子どもと交代で使って遊ぶ。App Store は使わず、
+Safari の「ホーム画面に追加」で全画面アプリとして動く Web アプリ（PWA）。
+
+- 1vs1 〜 3vs3 のチームバトル
+- エネルギー値がそのまま「たいりょく」。0 になったらひんし
+- コイントスで先攻を決め、サイコロの出目でダメージを与える
+- こうかばつぐんで +20、たいりょくが 1/3 以下になるとメガシンカしてサイコロが2個に
+- 全力で攻撃すると「つかれる」。次のターンは半減するので、交代して戦うと有利
+- ばつぐんの加算値・メガシンカのタイミング・つかれルールは設定で変更できる
+- 登録したピックはデータベース（IndexedDB）に保存され、次回からは選ぶだけ
+
+## ドキュメント
+
+| ファイル | 内容 |
+| --- | --- |
+| [docs/SPEC.md](docs/SPEC.md) | 仕様書 v0.3（ゲームルール・設定・バランス検証・UX要件・画面・データモデル・iPhone/PWA対応・データベース・開発フェーズ） |
+| [tools/balance-sim.py](tools/balance-sim.py) | バトル時間のバランス検証シミュレーター |
+
+ルールや設定の既定値を変えたら、シミュレーターでプレイ時間を再確認する。
+
+```
+python3 tools/balance-sim.py
+```
+
+## iPhone で遊ぶには
+
+### 1. GitHub Pages に置く（おすすめ・URL がずっと使える）
+
+1. GitHub のリポジトリで **Settings → Pages → Source** を `GitHub Actions` にする
+2. **Actions** タブ → `Deploy to GitHub Pages` → **Run workflow** で配信したいブランチを選んで実行
+3. 数分後、`https://<ユーザー名>.github.io/pokemonfrienda_pickbattle_repos/` で開けるようになる
+
+iPhone の Safari でその URL を開き、**共有ボタン → 「ホーム画面に追加」**。
+アイコンから全画面で起動する。App Store も Apple Developer Program も不要。
+
+> 以後、`main` に push するたび自動で更新される。
+
+### 2. 手元の PC ですぐ試す（同じ Wi-Fi の iPhone から見る）
+
+```
+npm install
+npm run dev -- --host
+```
+
+表示される `http://192.168.x.x:5173/` を iPhone の Safari で開く。
+PC を起動している間だけ遊べる。
+
+## 開発
+
+```
+npm install
+npm run dev       # 開発サーバー
+npm test          # ルールのユニットテスト（49件）
+npm run typecheck
+npm run build
+```
+
+### スモークテスト
+
+iPhone SE（375×667）の画面で 1バトルを最後まで自動プレイし、
+こうかばつぐん・つかれ・メガシンカが出ること、画面がはみ出さないことを確かめる。
+
+```
+npm run build
+npm run preview &            # http://localhost:4173
+TEAM_SIZE=3 npm run smoke    # 環境により CHROMIUM_PATH=... を付ける
+```
+
+## 開発状況
+
+- 仕様策定（v0.3）… 完了
+- **P0: ルールの土台**（タイプ相性・ダメージ計算・つかれ・メガシンカ・バトル進行 + テスト49件）… 完了
+- **P1: 遊べる最小版**（タイトル → 人数 → チーム → コイントス → バトル → けっか。ずかんは仮データ）… 完了
+- P2: ずかんデータベース（IndexedDB）… これから

@@ -1,0 +1,493 @@
+/* 幼稚園児が親の iPhone で遊ぶ前提のスタイル（docs/SPEC.md §6・§9.3/§9.4） */
+:root {
+  --bg: #f3f6fb;
+  --panel: #ffffff;
+  --ink: #1f2933;
+  --ink-soft: #5b6b7c;
+  --accent: #2b6cb0;
+  --p1: #e04a5f;
+  --p2: #3b7dd8;
+  --hp-good: #3fa845;
+  --hp-warn: #e8a317;
+  --hp-bad: #d9453d;
+  --radius: 16px;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Hiragino Maru Gothic ProN', 'ヒラギノ丸ゴ ProN W4', 'Yu Gothic', sans-serif;
+  font-size: 18px;
+  line-height: 1.5;
+  touch-action: manipulation;
+  overscroll-behavior: none;
+}
+
+/* 画面いっぱい。Safari のアドレスバー伸縮で崩れないよう dvh を使う */
+.screen {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
+  overflow: hidden;
+}
+
+.screen__body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  min-height: 0;
+}
+
+/* --- ボタン（タップ領域は最低 64px: UX要件 U-2） --- */
+.btn {
+  min-height: 64px;
+  padding: 12px 20px;
+  border: none;
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: #fff;
+  font: inherit;
+  font-size: 22px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.18);
+  transition: transform 80ms ease;
+}
+
+.btn:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.18);
+}
+
+.btn--ghost {
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.1);
+}
+
+.btn--big {
+  font-size: 28px;
+  min-height: 84px;
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  box-shadow: none;
+}
+
+.btn-row {
+  display: flex;
+  gap: 10px;
+}
+
+.btn-row .btn {
+  flex: 1;
+}
+
+/* --- 見出し --- */
+.title {
+  font-size: 30px;
+  font-weight: 800;
+  text-align: center;
+  margin: 0;
+}
+
+.subtitle {
+  text-align: center;
+  color: var(--ink-soft);
+  margin: 0;
+}
+
+.message {
+  text-align: center;
+  font-size: 21px;
+  font-weight: 700;
+  min-height: 1.6em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* --- ポケモンのカード --- */
+.card {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  padding: 8px 6px;
+  border: 4px solid transparent;
+  border-radius: var(--radius);
+  background: var(--panel);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+  text-align: center;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition: transform 120ms ease;
+}
+
+.card__name {
+  font-size: 15px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.card__type {
+  display: inline-block;
+  margin: 4px 0;
+  padding: 2px 10px;
+  border-radius: 999px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.card__hp-bar {
+  height: 12px;
+  border-radius: 999px;
+  background: #e3e8ef;
+  overflow: hidden;
+}
+
+.card__hp-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 400ms ease;
+}
+
+.card__hp-text {
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 名前に重ならないよう、マーク用の行を必ず確保する */
+.card__marks {
+  height: 20px;
+  font-size: 17px;
+  line-height: 20px;
+}
+
+/* 選べるカードは光って跳ねる（UX要件 U-4） */
+.card--selectable {
+  animation: bob 1.1s ease-in-out infinite;
+}
+
+.card--selectable::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: var(--radius);
+  border: 4px solid #ffd24a;
+  pointer-events: none;
+}
+
+.card--selected {
+  border-color: var(--accent);
+  transform: translateY(-6px) scale(1.04);
+  animation: none;
+}
+
+.card--selected::after {
+  display: none;
+}
+
+.card--dimmed {
+  opacity: 0.45;
+}
+
+.card--fainted {
+  opacity: 0.35;
+  filter: grayscale(1);
+}
+
+.card--tired {
+  filter: saturate(0.5);
+}
+
+.card--mega {
+  border-color: #b06bd8;
+  background: linear-gradient(140deg, #fff, #ffe9fb);
+}
+
+@keyframes bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+/* --- バトル画面 --- */
+.team {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.team-label {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink-soft);
+  text-align: center;
+}
+
+.team-label--p1 {
+  color: var(--p1);
+}
+
+.team-label--p2 {
+  color: var(--p2);
+}
+
+.battle-center {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* 結果の演出中は、中央のどこを押しても次に進める（園児が押しやすいように） */
+.battle-center--tappable {
+  cursor: pointer;
+}
+
+.tap-hint {
+  font-size: 15px;
+  color: var(--ink-soft);
+  font-weight: 700;
+}
+
+/* サイコロ自体をタップして振る。ボタンを別に置くより的が大きく分かりやすい */
+.dice-button {
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  animation: bob 1.1s ease-in-out infinite;
+}
+
+/* --- サイコロ --- */
+.dice {
+  display: flex;
+  gap: 12px;
+}
+
+.die {
+  width: 74px;
+  height: 74px;
+  border-radius: 18px;
+  background: #fff;
+  border: 3px solid #d5dce6;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 42px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.die--rolling {
+  animation: shake 0.45s linear infinite;
+}
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: rotate(-9deg) translateY(0);
+  }
+  50% {
+    transform: rotate(9deg) translateY(-8px);
+  }
+}
+
+/* --- バッジ・演出 --- */
+.badge {
+  padding: 4px 14px;
+  border-radius: 999px;
+  font-weight: 800;
+  font-size: 17px;
+}
+
+.badge--super {
+  background: #ffe27a;
+  color: #7a5200;
+}
+
+.badge--tired {
+  background: #dfe6ee;
+  color: #4a5a6a;
+}
+
+.badge--mega {
+  background: linear-gradient(90deg, #ffd1f4, #d9c6ff);
+  color: #6b2f8c;
+}
+
+.damage {
+  font-size: 42px;
+  font-weight: 900;
+  color: var(--hp-bad);
+  font-variant-numeric: tabular-nums;
+  animation: pop 320ms ease-out;
+}
+
+@keyframes pop {
+  from {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* --- オーバーレイ（受け渡し・確認） --- */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 30, 45, 0.82);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 24px;
+  text-align: center;
+  color: #fff;
+  z-index: 10;
+}
+
+.overlay__title {
+  font-size: 30px;
+  font-weight: 800;
+}
+
+.overlay__panel {
+  background: var(--panel);
+  color: var(--ink);
+  border-radius: 20px;
+  padding: 24px;
+  width: 100%;
+  max-width: 340px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* --- 一覧の選択（人数・チーム） --- */
+.choice-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.pick-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  overflow-y: auto;
+  min-height: 0;
+  padding-bottom: 4px;
+}
+
+.pick-item {
+  padding: 10px;
+  border-radius: var(--radius);
+  border: 4px solid transparent;
+  background: var(--panel);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  font: inherit;
+  color: inherit;
+  text-align: center;
+  cursor: pointer;
+  min-height: 92px;
+}
+
+.pick-item--selected {
+  border-color: var(--accent);
+  background: #eaf2fd;
+}
+
+.pick-item__order {
+  display: inline-block;
+  min-width: 24px;
+  margin-top: 2px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+/* --- コイントス --- */
+.coin {
+  width: 160px;
+  height: 160px;
+  border-radius: 50%;
+  border: none;
+  background: radial-gradient(circle at 34% 30%, #ffe9a8, #e0ac2b);
+  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.2);
+  font-size: 64px;
+  cursor: pointer;
+}
+
+.coin--spinning {
+  animation: flip 0.5s linear infinite;
+}
+
+@keyframes flip {
+  0% {
+    transform: rotateX(0);
+  }
+  100% {
+    transform: rotateX(360deg);
+  }
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-height: 0;
+}
+
+.result-mvp {
+  background: var(--panel);
+  border-radius: var(--radius);
+  padding: 14px;
+  text-align: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
