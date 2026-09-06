@@ -1,0 +1,2 @@
+# pokemonfrienda_pickbattle_repos
+ポケモンフレンダのピックを使った対戦アプリ。
