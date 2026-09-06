@@ -1,11 +1,15 @@
 import { calcDamage } from './damage';
 import { diceCountFor } from './dice';
 import { updateFatigue } from './fatigue';
-import { applyMegaEvolution } from './megaEvolution';
+import { findMegaCandidateIndex } from './megaEvolution';
 import { OPPONENT_OF } from './types';
 import type { BattlePokemon, Pick, PlayerId, Settings } from './types';
 
 export type BattlePhase =
+  /** メガシンカ できる子がいる。する / しない を選ぶ */
+  | 'megaPrompt'
+  /** メガシンカ の演出中 */
+  | 'megaEvolving'
   | 'selectAttacker'
   | 'selectTarget'
   | 'rollDice'
@@ -22,8 +26,6 @@ export interface TurnResult {
   isSuperEffective: boolean;
   isTired: boolean;
   targetFainted: boolean;
-  /** この攻撃をきっかけにメガシンカしたポケモンの名前 */
-  megaEvolvedNames: string[];
 }
 
 export interface BattleState {
@@ -33,12 +35,18 @@ export interface BattleState {
   phase: BattlePhase;
   selectedAttackerIndex: number | null;
   selectedTargetIndex: number | null;
+  /** メガシンカ できる自分のポケモン。いなければ null */
+  megaCandidateIndex: number | null;
   lastResult: TurnResult | null;
   winner: PlayerId | null;
   settings: Settings;
 }
 
 export type BattleAction =
+  /** メガシンカ する */
+  | { type: 'megaEvolve' }
+  /** いまは メガシンカ しない。このターンは もう聞かない */
+  | { type: 'declineMega' }
   | { type: 'selectAttacker'; index: number }
   | { type: 'selectTarget'; index: number }
   /** 選択をやり直す。サイコロを振るまではいつでも戻れる */
@@ -55,6 +63,7 @@ export function toBattlePokemon(pick: Pick): BattlePokemon {
     maxHp: pick.energy,
     hp: pick.energy,
     canMegaEvolve: pick.canMegaEvolve,
+    ...(pick.silhouette ? { silhouette: pick.silhouette } : {}),
     megaEvolved: false,
     tired: false,
     damageDealt: 0,
@@ -74,6 +83,7 @@ export function createBattle(
     phase: 'selectAttacker',
     selectedAttackerIndex: null,
     selectedTargetIndex: null,
+    megaCandidateIndex: null,
     lastResult: null,
     winner: null,
     settings,
@@ -109,8 +119,36 @@ function cloneTeams(teams: Record<PlayerId, BattlePokemon[]>): Record<PlayerId, 
   };
 }
 
+/** ターンのはじめ。メガシンカ できる子がいれば、まずそれを聞く */
+function startTurn(state: BattleState, turnPlayer: PlayerId): BattleState {
+  const megaCandidateIndex = findMegaCandidateIndex(state.teams[turnPlayer], state.settings);
+  return {
+    ...state,
+    turnPlayer,
+    phase: megaCandidateIndex === null ? 'selectAttacker' : 'megaPrompt',
+    megaCandidateIndex,
+    selectedAttackerIndex: null,
+    selectedTargetIndex: null,
+  };
+}
+
 export function battleReducer(state: BattleState, action: BattleAction): BattleState {
   switch (action.type) {
+    case 'megaEvolve': {
+      if (state.phase !== 'megaPrompt' || state.megaCandidateIndex === null) return state;
+      const teams = cloneTeams(state.teams);
+      const pokemon = teams[state.turnPlayer][state.megaCandidateIndex];
+      if (!pokemon) return state;
+      pokemon.megaEvolved = true;
+      return { ...state, teams, phase: 'megaEvolving' };
+    }
+
+    case 'declineMega': {
+      if (state.phase !== 'megaPrompt') return state;
+      // 断ったら、このターンはもう聞かない（次のターンにまた聞く）
+      return { ...state, phase: 'selectAttacker', megaCandidateIndex: null };
+    }
+
     case 'selectAttacker': {
       if (state.phase !== 'selectAttacker' && state.phase !== 'selectTarget') return state;
       const pokemon = state.teams[state.turnPlayer][action.index];
@@ -168,8 +206,7 @@ export function battleReducer(state: BattleState, action: BattleAction): BattleS
       if (state.settings.fatigueEnabled) {
         updateFatigue(attackerTeam, attackerIndex, isTired);
       }
-      // メガシンカは、ダメージを受けた側について攻撃解決の直後に判定する
-      const megaEvolved = applyMegaEvolution(defenderTeam, state.settings);
+      // メガシンカはここでは起こさない。やられた側が自分のターンのはじめに選ぶ
 
       return {
         ...state,
@@ -183,7 +220,6 @@ export function battleReducer(state: BattleState, action: BattleAction): BattleS
           isSuperEffective,
           isTired,
           targetFainted: target.hp === 0,
-          megaEvolvedNames: megaEvolved.map((pokemon) => pokemon.name),
         },
       };
     }
@@ -197,14 +233,15 @@ export function battleReducer(state: BattleState, action: BattleAction): BattleS
         return { ...state, phase: 'handOff' };
       }
 
+      // メガシンカの演出が終わった。ほかにもできる子がいれば続けて聞く
+      if (state.phase === 'megaEvolving') {
+        return startTurn(state, state.turnPlayer);
+      }
+
       if (state.phase === 'handOff') {
         return {
-          ...state,
-          turnPlayer: OPPONENT_OF[state.turnPlayer],
+          ...startTurn(state, OPPONENT_OF[state.turnPlayer]),
           turnCount: state.turnCount + 1,
-          phase: 'selectAttacker',
-          selectedAttackerIndex: null,
-          selectedTargetIndex: null,
         };
       }
 

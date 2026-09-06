@@ -66,7 +66,7 @@ export function CoinTossScreen({ p1Name, p2Name, onDecided }: Props) {
               {SIDE_LABEL[result]}！ {firstPlayer === 'p1' ? p1Name : p2Name}が さきばん！
             </div>
             <button type="button" className="btn btn--big" onClick={() => onDecided(firstPlayer)}>
-              ばとる スタート！
+              バトル スタート！
             </button>
           </>
         )}

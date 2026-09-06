@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyMegaEvolution, shouldMegaEvolve } from '../megaEvolution';
+import { findMegaCandidateIndex, shouldMegaEvolve } from '../megaEvolution';
 import { makePokemon, makeSettings } from './testHelpers';
 
 describe('shouldMegaEvolve（docs/SPEC.md §3.6）', () => {
@@ -43,18 +43,21 @@ describe('shouldMegaEvolve（docs/SPEC.md §3.6）', () => {
   });
 });
 
-describe('applyMegaEvolution', () => {
-  it('条件を満たしたポケモンだけをメガシンカさせ、その一覧を返す', () => {
-    const settings = makeSettings({ megaThreshold: 'third' });
+describe('findMegaCandidateIndex', () => {
+  const settings = makeSettings({ megaThreshold: 'third' });
+
+  it('メガシンカ できる子をさがす。さがすだけで、かってに進化はしない', () => {
     const team = [
-      makePokemon({ name: 'A', maxHp: 300, hp: 90, canMegaEvolve: true }),
-      makePokemon({ name: 'B', maxHp: 300, hp: 250, canMegaEvolve: true }),
+      makePokemon({ name: 'A', maxHp: 300, hp: 250, canMegaEvolve: true }),
+      makePokemon({ name: 'B', maxHp: 300, hp: 90, canMegaEvolve: true }),
       makePokemon({ name: 'C', maxHp: 300, hp: 10, canMegaEvolve: false }),
     ];
-    const evolved = applyMegaEvolution(team, settings);
-    expect(evolved.map((pokemon) => pokemon.name)).toEqual(['A']);
-    expect(team[0]!.megaEvolved).toBe(true);
-    expect(team[1]!.megaEvolved).toBe(false);
-    expect(team[2]!.megaEvolved).toBe(false);
+    expect(findMegaCandidateIndex(team, settings)).toBe(1);
+    expect(team.every((pokemon) => !pokemon.megaEvolved)).toBe(true);
+  });
+
+  it('だれもできないときは null', () => {
+    const team = [makePokemon({ maxHp: 300, hp: 300, canMegaEvolve: true })];
+    expect(findMegaCandidateIndex(team, settings)).toBeNull();
   });
 });

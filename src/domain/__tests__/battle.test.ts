@@ -14,6 +14,8 @@ import { OPPONENT_OF } from '../types';
 import { makePick, makeSettings } from './testHelpers';
 
 const settings = makeSettings({ damageMultiplier: 20, superEffectiveBonus: 20 });
+// メガシンカの検証では、つかれによる半減で発動ラインがぼやけないよう切っておく
+const megaSettings = makeSettings({ damageMultiplier: 20, fatigueEnabled: false });
 
 function apply(state: BattleState, ...actions: BattleAction[]): BattleState {
   return actions.reduce(battleReducer, state);
@@ -34,9 +36,12 @@ function handOff(state: BattleState): BattleState {
   return apply(state, { type: 'next' }, { type: 'next' });
 }
 
-/** 相手に軽く1回攻撃させて、手番を自分に戻す */
+/** 相手に軽く1回攻撃させて、手番を自分に戻す（メガシンカを聞かれたら断る） */
 function opponentTurn(state: BattleState): BattleState {
-  const afterHandOff = handOff(state);
+  let afterHandOff = handOff(state);
+  if (afterHandOff.phase === 'megaPrompt') {
+    afterHandOff = battleReducer(afterHandOff, { type: 'declineMega' });
+  }
   const attackerIndex = afterHandOff.teams[afterHandOff.turnPlayer].findIndex(isAlive);
   const targetIndex = afterHandOff.teams[OPPONENT_OF[afterHandOff.turnPlayer]].findIndex(isAlive);
   const withSelection = apply(
@@ -159,44 +164,106 @@ describe('バトルの進行', () => {
     expect(state.winner).toBe('p1');
   });
 
-  it('メガシンカ中はサイコロが2個になる', () => {
-    // つかれでダメージが半減すると発動ラインの検証がぼやけるので、ここでは切っておく
-    let state = createBattle(
-      [makePick()],
-      [makePick({ energy: 300, canMegaEvolve: true })],
-      'p1',
-      makeSettings({ damageMultiplier: 20, fatigueEnabled: false }),
-    );
-    expect(diceCountForTurn(state)).toBe(1);
-
-    // 300 → 100（1/3以下）でメガシンカ
-    state = opponentTurn(attack(state, 0, 0, [5])); // 100ダメージ → hp 200
-    state = attack(state, 0, 0, [5]); // hp 100 → メガシンカ発動
-    expect(state.teams.p2[0]!.megaEvolved).toBe(true);
-    expect(state.lastResult?.megaEvolvedNames).toEqual([state.teams.p2[0]!.name]);
-
-    // メガシンカした p2 の手番では、サイコロが2個になる
-    state = handOff(state);
-    expect(state.turnPlayer).toBe('p2');
-    state = battleReducer(state, { type: 'selectAttacker', index: 0 });
-    expect(selectedAttacker(state)?.megaEvolved).toBe(true);
-    expect(diceCountForTurn(state)).toBe(2);
-  });
-
-  it('たいりょくが ちょうど 1/3 のときも メガシンカする', () => {
+  it('こうげきされただけでは かってに メガシンカ しない', () => {
     const state = attack(
       createBattle(
         [makePick()],
         [makePick({ energy: 300, canMegaEvolve: true })],
         'p1',
-        makeSettings({ damageMultiplier: 20, fatigueEnabled: false }),
+        megaSettings,
       ),
       0,
       0,
       [5, 5], // 200ダメージ → hp 100 = 300 の ちょうど 1/3
     );
     expect(state.teams.p2[0]!.hp).toBe(100);
+    expect(state.teams.p2[0]!.megaEvolved).toBe(false);
+  });
+
+  it('たいりょくが へると、自分のターンのはじめに メガシンカ するか きかれる', () => {
+    let state = createBattle(
+      [makePick()],
+      [makePick({ energy: 300, canMegaEvolve: true })],
+      'p1',
+      megaSettings,
+    );
+    // はじめは だれも メガシンカ できない
+    expect(state.phase).toBe('selectAttacker');
+
+    state = handOff(attack(state, 0, 0, [5, 5])); // hp 100（ちょうど 1/3）
+    expect(state.turnPlayer).toBe('p2');
+    expect(state.phase).toBe('megaPrompt');
+    expect(state.megaCandidateIndex).toBe(0);
+  });
+
+  it('「する」を選ぶと メガシンカ して、サイコロが2個になる', () => {
+    let state = handOff(
+      attack(
+        createBattle([makePick()], [makePick({ energy: 300, canMegaEvolve: true })], 'p1', megaSettings),
+        0,
+        0,
+        [5, 5],
+      ),
+    );
+    state = battleReducer(state, { type: 'megaEvolve' });
+    expect(state.phase).toBe('megaEvolving'); // 演出を見せる
     expect(state.teams.p2[0]!.megaEvolved).toBe(true);
+
+    state = battleReducer(state, { type: 'next' }); // 演出おわり
+    expect(state.phase).toBe('selectAttacker');
+
+    state = battleReducer(state, { type: 'selectAttacker', index: 0 });
+    expect(selectedAttacker(state)?.megaEvolved).toBe(true);
+    expect(diceCountForTurn(state)).toBe(2);
+  });
+
+  it('「いまはしない」を選ぶと メガシンカ せずに こうげきに進む', () => {
+    let state = handOff(
+      attack(
+        createBattle([makePick()], [makePick({ energy: 300, canMegaEvolve: true })], 'p1', megaSettings),
+        0,
+        0,
+        [5, 5],
+      ),
+    );
+    state = battleReducer(state, { type: 'declineMega' });
+    expect(state.phase).toBe('selectAttacker');
+    expect(state.teams.p2[0]!.megaEvolved).toBe(false);
+    expect(state.megaCandidateIndex).toBeNull();
+  });
+
+  it('ことわっても、つぎの自分のターンに また きかれる', () => {
+    let state = handOff(
+      attack(
+        createBattle([makePick()], [makePick({ energy: 300, canMegaEvolve: true })], 'p1', megaSettings),
+        0,
+        0,
+        [5, 5],
+      ),
+    );
+    state = battleReducer(state, { type: 'declineMega' });
+    // p2 が1回こうげきして、p1 をはさんで p2 の手番に戻す
+    state = handOff(attack(state, 0, 0, [1]));
+    state = handOff(attack(state, 0, 0, [1]));
+    expect(state.turnPlayer).toBe('p2');
+    expect(state.phase).toBe('megaPrompt');
+  });
+
+  it('2体できるときは、1体ずつ きかれる', () => {
+    const weak = () => makePick({ energy: 300, canMegaEvolve: true });
+    let state = createBattle([makePick()], [weak(), weak()], 'p1', megaSettings);
+    state = handOff(attack(state, 0, 0, [5, 5])); // p2 の1体目が 1/3 に
+    state = battleReducer(state, { type: 'megaEvolve' });
+    state = battleReducer(state, { type: 'next' });
+    // 2体目はまだ元気なので、もう聞かれない
+    expect(state.phase).toBe('selectAttacker');
+
+    // 2体目（index 1）も減らすと、次のターンに聞かれる
+    state = handOff(attack(state, 0, 0, [1])); // p2 のターン
+    state = handOff(attack(state, 0, 1, [5, 5])); // p1 が p2 の2体目をねらう
+    expect(state.teams.p2[1]!.hp).toBe(100);
+    expect(state.phase).toBe('megaPrompt');
+    expect(state.megaCandidateIndex).toBe(1);
   });
 
   it('つかれた状態で攻撃するとダメージが半分になる', () => {
@@ -253,7 +320,12 @@ describe('1バトルを最後まで完走できる（P0の完了条件）', () =
       guard += 1;
       if (guard > 500) throw new Error('バトルが終わらない');
 
-      if (state.phase === 'selectAttacker') {
+      if (state.phase === 'megaPrompt') {
+        // できるときは必ず メガシンカ する
+        state = battleReducer(state, { type: 'megaEvolve' });
+      } else if (state.phase === 'megaEvolving') {
+        state = battleReducer(state, { type: 'next' });
+      } else if (state.phase === 'selectAttacker') {
         const team = state.teams[state.turnPlayer];
         // つかれていない子を優先して選ぶ（交代して戦う）
         const fresh = team.findIndex((p) => isAlive(p) && !p.tired);
