@@ -31,12 +31,26 @@ python3 tools/balance-sim.py
 
 ```
 npm install
-npm test          # ルールのユニットテスト
+npm run dev       # 開発サーバー
+npm test          # ルールのユニットテスト（49件）
 npm run typecheck
+npm run build
+```
+
+### スモークテスト
+
+iPhone SE（375×667）の画面で 1バトルを最後まで自動プレイし、
+こうかばつぐん・つかれ・メガシンカが出ること、画面がはみ出さないことを確かめる。
+
+```
+npm run build
+npm run preview &            # http://localhost:4173
+TEAM_SIZE=3 npm run smoke    # 環境により CHROMIUM_PATH=... を付ける
 ```
 
 ## 開発状況
 
 - 仕様策定（v0.3）… 完了
 - **P0: ルールの土台**（タイプ相性・ダメージ計算・つかれ・メガシンカ・バトル進行 + テスト49件）… 完了
-- P1: 遊べる最小版（UI）… これから
+- **P1: 遊べる最小版**（タイトル → 人数 → チーム → コイントス → バトル → けっか。ずかんは仮データ）… 完了
+- P2: ずかんデータベース（IndexedDB）… これから
