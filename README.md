@@ -27,6 +27,29 @@ Safari の「ホーム画面に追加」で全画面アプリとして動く Web
 python3 tools/balance-sim.py
 ```
 
+## iPhone で遊ぶには
+
+### 1. GitHub Pages に置く（おすすめ・URL がずっと使える）
+
+1. GitHub のリポジトリで **Settings → Pages → Source** を `GitHub Actions` にする
+2. **Actions** タブ → `Deploy to GitHub Pages` → **Run workflow** で配信したいブランチを選んで実行
+3. 数分後、`https://<ユーザー名>.github.io/pokemonfrienda_pickbattle_repos/` で開けるようになる
+
+iPhone の Safari でその URL を開き、**共有ボタン → 「ホーム画面に追加」**。
+アイコンから全画面で起動する。App Store も Apple Developer Program も不要。
+
+> 以後、`main` に push するたび自動で更新される。
+
+### 2. 手元の PC ですぐ試す（同じ Wi-Fi の iPhone から見る）
+
+```
+npm install
+npm run dev -- --host
+```
+
+表示される `http://192.168.x.x:5173/` を iPhone の Safari で開く。
+PC を起動している間だけ遊べる。
+
 ## 開発
 
 ```
