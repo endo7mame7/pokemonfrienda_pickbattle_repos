@@ -197,8 +197,7 @@ export function App() {
     case 'coinToss':
       return (
         <CoinTossScreen
-          p1Name={PLAYER_NAMES.p1}
-          p2Name={PLAYER_NAMES.p2}
+          playerNames={PLAYER_NAMES}
           onDecided={(firstPlayer) =>
             setFlow({ name: 'battle', p1: flow.p1, p2: flow.p2, firstPlayer })
           }

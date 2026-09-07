@@ -16,7 +16,7 @@ await page.getByText('けってい').click();
 await page.getByText('じゅんび できた').click();
 for (const n of ['フシギバナ','ゲンガー','ギャラドス']) await page.getByText(n, { exact: true }).click();
 await page.getByText('けってい').click();
-await page.getByText('モンスターボール').click();
+await page.getByText('コインを なげる').click();
 await page.waitForTimeout(1400);
 await page.getByText('バトル スタート').click();
 

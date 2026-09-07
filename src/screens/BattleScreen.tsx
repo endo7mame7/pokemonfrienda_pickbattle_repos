@@ -1,4 +1,6 @@
-import { useEffect, useReducer, useState } from 'react';
+import { useEffect, useLayoutEffect, useReducer, useRef, useState } from 'react';
+import { AttackAnimation } from '../components/AttackAnimation';
+import type { AttackPath } from '../components/AttackAnimation';
 import { Dice } from '../components/Dice';
 import { PokemonCard } from '../components/PokemonCard';
 import { Silhouette } from '../components/Silhouette';
@@ -38,12 +40,40 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
     (init) => createBattle(init.p1, init.p2, init.firstPlayer, init.settings),
   );
   const [rolling, setRolling] = useState(false);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  // 攻撃エフェクトを、こうげきする子から ねらわれた子へ飛ばすための位置
+  const [path, setPath] = useState<AttackPath | null>(null);
   // つかれている子を選んだときの「それでも いい？」確認（docs/SPEC.md §3.7）
   const [tiredConfirmIndex, setTiredConfirmIndex] = useState<number | null>(null);
 
   useEffect(() => {
     if (state.phase === 'finished') onFinish(state);
   }, [state, onFinish]);
+
+  // カードの位置を測って、そこへエフェクトを飛ばす
+  useLayoutEffect(() => {
+    if (state.phase !== 'attacking') return;
+    const body = bodyRef.current;
+    const result = state.lastResult;
+    if (!body || !result || state.selectedAttackerIndex === null) return;
+
+    const center = (id: string) => {
+      const card = body.querySelector(`[data-card-id="${id}"]`);
+      if (!card) return null;
+      const area = body.getBoundingClientRect();
+      const box = card.getBoundingClientRect();
+      return {
+        x: box.left + box.width / 2 - area.left,
+        y: box.top + box.height / 2 - area.top,
+      };
+    };
+
+    const from = center(`${state.turnPlayer}-${state.selectedAttackerIndex}`);
+    const to = center(`${OPPONENT_OF[state.turnPlayer]}-${result.targetIndex}`);
+    if (from && to) {
+      setPath({ fromX: from.x, fromY: from.y, toX: to.x, toY: to.y });
+    }
+  }, [state.phase, state.lastResult, state.selectedAttackerIndex, state.turnPlayer]);
 
   // 攻撃エフェクトを見せてから、ダメージを当てる
   useEffect(() => {
@@ -122,6 +152,7 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
           <PokemonCard
             key={pokemon.pickId + index}
             pokemon={pokemon}
+            cardId={`${side}-${index}`}
             selectable={selectable && isAlive(pokemon)}
             selected={
               isAttackerSide
@@ -134,11 +165,7 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
               result &&
               side === targetSide &&
               result.targetIndex === index
-                ? {
-                    type: result.attackerType,
-                    damage: result.damage,
-                    isSuperEffective: result.isSuperEffective,
-                  }
+                ? { damage: result.damage }
                 : undefined
             }
             onSelect={() =>
@@ -162,7 +189,7 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
 
   return (
     <div className="screen">
-      <div className="screen__body">
+      <div className="screen__body screen__body--battle" ref={bodyRef}>
         {teamLabel(TOP)}
         {renderTeam(TOP)}
 
@@ -188,7 +215,7 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
 
           {(state.phase === 'attacking' || state.phase === 'resolve') && result && (
             <>
-              <Dice values={result.rolls} rolling={false} />
+              <Dice values={result.rolls} rolling={false} small />
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center' }}>
                 {result.isSuperEffective && (
                   <span className="badge badge--super">
@@ -197,13 +224,8 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
                 )}
                 {result.isTired && <span className="badge badge--tired">💤 つかれて はんぶん</span>}
               </div>
-              {/* ダメージの数は、エフェクトが終わってから出す */}
-              {state.phase === 'resolve' && (
-                <>
-                  <div className="damage">-{result.damage}</div>
-                  <div className="tap-hint">タップして つぎへ 👆</div>
-                </>
-              )}
+              {/* ダメージの数は、当たった場所に大きく出す（下の演出レイヤー） */}
+              {state.phase === 'resolve' && <div className="tap-hint">タップして つぎへ 👆</div>}
             </>
           )}
 
@@ -222,6 +244,17 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
 
         {renderTeam(BOTTOM)}
         {teamLabel(BOTTOM)}
+
+        {path && result && (state.phase === 'attacking' || state.phase === 'resolve') && (
+          <AttackAnimation
+            key={`${state.turnCount}-${state.phase}`}
+            path={path}
+            type={result.attackerType}
+            damage={result.damage}
+            isSuperEffective={result.isSuperEffective}
+            phase={state.phase}
+          />
+        )}
       </div>
 
       {tiredConfirmIndex !== null && (

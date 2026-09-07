@@ -58,7 +58,7 @@ for (const name of ['フシギバナ', 'ゲンガー', 'ギャラドス'].slice(
 await page.getByText('けってい').click();
 
 await shot('05-cointoss');
-await page.getByText('モンスターボール').click();
+await page.getByText('コインを なげる').click();
 await page.waitForTimeout(1500);
 await shot('06-cointoss-result');
 await page.getByText('バトル スタート').click();

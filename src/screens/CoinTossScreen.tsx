@@ -2,70 +2,58 @@ import { useState } from 'react';
 import type { PlayerId } from '../domain';
 
 interface Props {
-  p1Name: string;
-  p2Name: string;
+  playerNames: Record<PlayerId, string>;
   onDecided: (firstPlayer: PlayerId) => void;
 }
 
-type Side = 'ball' | 'foot';
-
-const SIDE_LABEL: Record<Side, string> = { ball: 'モンスターボール', foot: 'あしあと' };
-const SIDE_EMOJI: Record<Side, string> = { ball: '⚪', foot: '🐾' };
-
 /**
  * コイントスで先攻を決める（docs/SPEC.md §3.1）。
- * 先に「どっちが でるか」を選ばせて、当事者感を出す。
+ * コインの表があか、裏があお。出た色のチームが先攻。
+ * 「どっちが出るか当てる」よりも、色がそのままチームなので園児にも分かりやすい。
  */
-export function CoinTossScreen({ p1Name, p2Name, onDecided }: Props) {
-  const [called, setCalled] = useState<Side | null>(null);
+export function CoinTossScreen({ playerNames, onDecided }: Props) {
   const [spinning, setSpinning] = useState(false);
-  const [result, setResult] = useState<Side | null>(null);
+  const [result, setResult] = useState<PlayerId | null>(null);
 
-  const toss = (call: Side) => {
-    setCalled(call);
+  const toss = () => {
     setSpinning(true);
-    const landed: Side = Math.random() < 0.5 ? 'ball' : 'foot';
+    const landed: PlayerId = Math.random() < 0.5 ? 'p1' : 'p2';
     window.setTimeout(() => {
       setSpinning(false);
       setResult(landed);
-    }, 1100);
+    }, 1200);
   };
-
-  // 当てた側が先攻。p1 が予想する形にしている
-  const firstPlayer: PlayerId | null =
-    result === null || called === null ? null : result === called ? 'p1' : 'p2';
 
   return (
     <div className="screen">
       <div className="screen__body stack">
-        <h1 className="title">どっちが でるかな？</h1>
-        <p className="subtitle">{p1Name}が よそうしてね</p>
+        <h1 className="title">どっちが さきばん？</h1>
 
-        <button
-          type="button"
-          className={spinning ? 'coin coin--spinning' : 'coin'}
-          disabled={!spinning && result === null}
+        <div
+          className={[
+            'coin',
+            spinning && 'coin--spinning',
+            result && `coin--${result}`,
+          ]
+            .filter(Boolean)
+            .join(' ')}
         >
-          {spinning ? '🌀' : SIDE_EMOJI[result ?? called ?? 'ball']}
-        </button>
+          {!spinning && result && playerNames[result]}
+          {!spinning && !result && '？'}
+        </div>
 
         {result === null && !spinning && (
-          <div className="btn-row" style={{ width: '100%' }}>
-            {(['ball', 'foot'] as const).map((side) => (
-              <button key={side} type="button" className="btn" onClick={() => toss(side)}>
-                {SIDE_EMOJI[side]}
-                <span style={{ display: 'block', fontSize: 14 }}>{SIDE_LABEL[side]}</span>
-              </button>
-            ))}
-          </div>
+          <button type="button" className="btn btn--big" onClick={toss}>
+            コインを なげる
+          </button>
         )}
 
-        {result !== null && firstPlayer !== null && (
+        {spinning && <div className="message">くるくる…</div>}
+
+        {result !== null && (
           <>
-            <div className="message">
-              {SIDE_LABEL[result]}！ {firstPlayer === 'p1' ? p1Name : p2Name}が さきばん！
-            </div>
-            <button type="button" className="btn btn--big" onClick={() => onDecided(firstPlayer)}>
+            <div className="message">{playerNames[result]}チームが さきばん！</div>
+            <button type="button" className="btn btn--big" onClick={() => onDecided(result)}>
               バトル スタート！
             </button>
           </>

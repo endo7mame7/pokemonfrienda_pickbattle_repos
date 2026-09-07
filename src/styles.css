@@ -47,6 +47,10 @@ body {
   overflow: hidden;
 }
 
+.screen__body--battle {
+  position: relative;
+}
+
 .screen__body {
   flex: 1;
   display: flex;
@@ -333,6 +337,13 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+.die--small {
+  width: 54px;
+  height: 54px;
+  border-radius: 14px;
+  font-size: 30px;
+}
+
 .die--rolling {
   animation: shake 0.45s linear infinite;
 }
@@ -348,11 +359,13 @@ body {
 }
 
 /* --- バッジ・演出 --- */
+/* ばつぐん と つかれ が両方出ても 1行におさまる大きさにする */
 .badge {
-  padding: 4px 14px;
+  padding: 4px 10px;
   border-radius: 999px;
   font-weight: 800;
-  font-size: 17px;
+  font-size: 15px;
+  white-space: nowrap;
 }
 
 .badge--super {
@@ -485,19 +498,33 @@ body {
 }
 
 /* --- コイントス --- */
+/* 表があか、裏があお。出た色のチームが先攻 */
 .coin {
-  width: 160px;
-  height: 160px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 170px;
+  height: 170px;
   border-radius: 50%;
-  border: none;
-  background: radial-gradient(circle at 34% 30%, #ffe9a8, #e0ac2b);
+  border: 8px solid rgba(255, 255, 255, 0.7);
+  background: linear-gradient(160deg, var(--p1) 0 50%, var(--p2) 50% 100%);
   box-shadow: 0 6px 0 rgba(0, 0, 0, 0.2);
-  font-size: 64px;
-  cursor: pointer;
+  color: #fff;
+  font-size: 52px;
+  font-weight: 900;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+
+.coin--p1 {
+  background: var(--p1);
+}
+
+.coin--p2 {
+  background: var(--p2);
 }
 
 .coin--spinning {
-  animation: flip 0.5s linear infinite;
+  animation: flip 0.42s linear infinite;
 }
 
 @keyframes flip {
@@ -831,90 +858,187 @@ body {
   background: var(--hp-bad);
 }
 
-/* --- 攻撃エフェクト（docs/SPEC.md §3.10） ---
+/* --- 攻撃の演出（docs/SPEC.md §3.10） ---
+   バトル画面ぜんたいに広げて、だれが だれを こうげきしたのかを見せる。
    --fx-intensity（0.35〜1.5）で はでさ が変わる */
-.fx {
+.fx-layer {
   position: absolute;
   inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   pointer-events: none;
-  z-index: 3;
+  overflow: hidden;
+  z-index: 5;
 }
 
-.fx__ring {
+/* 画面ぜんたいが タイプの色に そまる */
+.fx-flash {
   position: absolute;
-  width: 46px;
-  height: 46px;
-  border-radius: 50%;
-  border: 5px solid var(--fx-color);
-  animation: fx-ring 620ms ease-out forwards;
+  inset: 0;
+  background: var(--fx-color);
+  opacity: 0;
+  animation: fx-flash 760ms ease-out forwards;
 }
 
-.fx__ring--extra {
-  border-color: #ffd24a;
-  animation-delay: 120ms;
-}
-
-.fx__center {
-  position: absolute;
-  font-size: calc(26px + 22px * var(--fx-intensity));
-  animation: fx-center 620ms ease-out forwards;
-}
-
-.fx__particle {
-  position: absolute;
-  font-size: calc(11px + 10px * var(--fx-intensity));
-  transform: rotate(var(--fx-angle));
-  animation: fx-particle 700ms ease-out forwards;
-  animation-delay: var(--fx-delay);
-}
-
-@keyframes fx-ring {
-  from {
-    transform: scale(0.3);
-    opacity: 0.95;
-  }
-  to {
-    transform: scale(calc(1.2 + 1.9 * var(--fx-intensity)));
+@keyframes fx-flash {
+  0%, 38% {
     opacity: 0;
   }
-}
-
-@keyframes fx-center {
-  0% {
-    transform: scale(0.3);
-    opacity: 0;
-  }
-  40% {
-    transform: scale(1.15);
-    opacity: 1;
+  48% {
+    opacity: calc(0.1 + 0.16 * var(--fx-intensity));
   }
   100% {
-    transform: scale(0.9);
     opacity: 0;
   }
 }
 
-@keyframes fx-particle {
+/* こうげきする子から、ねらわれた子へ飛んでいく */
+.fx-shot {
+  position: absolute;
+  left: 0;
+  top: 0;
+  font-size: calc(30px + 16px * var(--fx-intensity));
+  filter: drop-shadow(0 0 10px var(--fx-color));
+  animation: fx-shot 400ms cubic-bezier(0.4, 0, 0.9, 0.6) forwards;
+}
+
+@keyframes fx-shot {
   0% {
-    transform: rotate(var(--fx-angle)) translateY(0) scale(0.5);
+    transform: translate(calc(var(--fx-from-x) - 50%), calc(var(--fx-from-y) - 50%)) scale(0.4);
     opacity: 0;
   }
   25% {
     opacity: 1;
   }
   100% {
-    transform: rotate(var(--fx-angle))
-      translateY(calc(-34px - 46px * var(--fx-intensity))) scale(1);
+    transform: translate(calc(var(--fx-to-x) - 50%), calc(var(--fx-to-y) - 50%)) scale(1.2);
+    opacity: 1;
+  }
+}
+
+/* 当たったところで はじける */
+.fx-impact {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  transform: translate(var(--fx-to-x), var(--fx-to-y));
+}
+
+.fx-impact__ring,
+.fx-impact__center,
+.fx-impact__particle {
+  position: absolute;
+  animation-delay: 380ms;
+  animation-fill-mode: both;
+  opacity: 0;
+}
+
+.fx-impact__ring {
+  width: 80px;
+  height: 80px;
+  margin: -40px 0 0 -40px;
+  border-radius: 50%;
+  border: 7px solid var(--fx-color);
+  animation-name: fx-impact-ring;
+  animation-duration: 520ms;
+  animation-timing-function: ease-out;
+}
+
+.fx-impact__ring--extra {
+  border-color: #ffd24a;
+  animation-delay: 470ms;
+}
+
+.fx-impact__center {
+  font-size: calc(44px + 44px * var(--fx-intensity));
+  transform: translate(-50%, -50%);
+  animation-name: fx-impact-center;
+  animation-duration: 520ms;
+  animation-timing-function: ease-out;
+}
+
+.fx-impact__particle {
+  font-size: calc(16px + 14px * var(--fx-intensity));
+  transform: rotate(var(--fx-angle));
+  animation-name: fx-impact-particle;
+  animation-duration: 600ms;
+  animation-timing-function: ease-out;
+}
+
+@keyframes fx-impact-ring {
+  from {
+    transform: scale(0.25);
+    opacity: 0.95;
+  }
+  to {
+    transform: scale(calc(1.1 + 1.5 * var(--fx-intensity)));
     opacity: 0;
+  }
+}
+
+@keyframes fx-impact-center {
+  0% {
+    transform: translate(-50%, -50%) scale(0.3);
+    opacity: 0;
+  }
+  35% {
+    transform: translate(-50%, -50%) scale(1.2);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0;
+  }
+}
+
+@keyframes fx-impact-particle {
+  0% {
+    transform: rotate(var(--fx-angle)) translateY(0) scale(0.4);
+    opacity: 0;
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    transform: rotate(var(--fx-angle)) translateY(calc(-52px - 66px * var(--fx-intensity))) scale(1);
+    opacity: 0;
+  }
+}
+
+/* 当たったところに ダメージの数を大きく出す */
+.fx-damage {
+  position: absolute;
+  left: 0;
+  top: 0;
+  font-size: calc(40px + 22px * var(--fx-intensity));
+  font-weight: 900;
+  /* カードの上に出るので、白でふちどって どこでも読めるようにする */
+  color: var(--hp-bad);
+  -webkit-text-stroke: 5px #fff;
+  paint-order: stroke fill;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+  animation: fx-damage 600ms cubic-bezier(0.2, 1.4, 0.4, 1) forwards;
+}
+
+@keyframes fx-damage {
+  0% {
+    transform: translate(calc(var(--fx-to-x) - 50%), calc(var(--fx-to-y) - 50%)) scale(0.4);
+    opacity: 0;
+  }
+  45% {
+    transform: translate(calc(var(--fx-to-x) - 50%), calc(var(--fx-to-y) - 90%)) scale(1.15);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(calc(var(--fx-to-x) - 50%), calc(var(--fx-to-y) - 150%)) scale(1);
+    opacity: 1;
   }
 }
 
 /* 攻撃を受けたカードが ゆれる */
 .card--hit {
-  animation: fx-shake 420ms ease-in-out;
+  animation: fx-shake 420ms ease-in-out 380ms;
 }
 
 @keyframes fx-shake {
@@ -933,9 +1057,11 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .fx__ring,
-  .fx__center,
-  .fx__particle,
+  .fx-flash,
+  .fx-shot,
+  .fx-impact__ring,
+  .fx-impact__center,
+  .fx-impact__particle,
   .card--hit {
     animation-duration: 1ms;
   }
