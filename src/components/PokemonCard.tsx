@@ -1,18 +1,17 @@
-import { AttackEffect } from './AttackEffect';
 import { effectIntensity } from '../ui/attackEffects';
-import type { BattlePokemon, PokemonType } from '../domain';
+import type { BattlePokemon } from '../domain';
 import { TYPE_COLORS } from '../ui/typeColors';
 import { PokemonFace } from './PokemonFace';
 
-/** 攻撃を受けている最中だけ渡される */
+/** 攻撃を受けている最中だけ渡される。カードは ゆれる だけ */
 export interface HitEffect {
-  type: PokemonType;
   damage: number;
-  isSuperEffective: boolean;
 }
 
 interface Props {
   pokemon: BattlePokemon;
+  /** エフェクトの位置をひろうための目印 */
+  cardId: string;
   selectable: boolean;
   selected: boolean;
   dimmed: boolean;
@@ -27,7 +26,9 @@ function hpColor(ratio: number): string {
 }
 
 /** たいりょくは 数値・バー・色 の3つで伝える（UX要件 U-7） */
-export function PokemonCard({ pokemon, selectable, selected, dimmed, hit, onSelect }: Props) {
+export function PokemonCard({
+  pokemon, cardId, selectable, selected, dimmed, hit, onSelect,
+}: Props) {
   const fainted = pokemon.hp <= 0;
   const ratio = pokemon.maxHp === 0 ? 0 : pokemon.hp / pokemon.maxHp;
 
@@ -51,6 +52,7 @@ export function PokemonCard({ pokemon, selectable, selected, dimmed, hit, onSele
       disabled={!selectable}
       onClick={onSelect}
       aria-label={`${pokemon.name} たいりょく ${pokemon.hp}`}
+      data-card-id={cardId}
       // ゆれの大きさも ダメージに合わせる
       style={
         hit
@@ -58,13 +60,6 @@ export function PokemonCard({ pokemon, selectable, selected, dimmed, hit, onSele
           : undefined
       }
     >
-      {hit && (
-        <AttackEffect
-          type={hit.type}
-          damage={hit.damage}
-          isSuperEffective={hit.isSuperEffective}
-        />
-      )}
       <div className="card__inner">
         <div className="card__marks">
           {fainted && '✕'}

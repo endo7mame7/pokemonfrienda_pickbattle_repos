@@ -93,7 +93,7 @@ await page.getByText('けってい').click();
 await page.getByText('じゅんび できた').click();
 await page.getByText('マイピカチュウ', { exact: true }).click();
 await page.getByText('けってい').click();
-await page.getByText('モンスターボール').click();
+await page.getByText('コインを なげる').click();
 await page.waitForTimeout(1400);
 await page.getByText('バトル スタート').click();
 await page.waitForTimeout(300);
