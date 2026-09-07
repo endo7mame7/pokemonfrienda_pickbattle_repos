@@ -1,4 +1,6 @@
 interface Props {
+  /** ずかんに登録された数まで。1たいしかいなければ 1vs1 だけ */
+  maxSize: number;
   onSelect: (size: number) => void;
   onBack: () => void;
 }
@@ -9,7 +11,7 @@ const SIZES = [
   { size: 3, label: '3たい3', hint: 'たっぷり あそぶ' },
 ];
 
-export function TeamSizeScreen({ onSelect, onBack }: Props) {
+export function TeamSizeScreen({ maxSize, onSelect, onBack }: Props) {
   return (
     <div className="screen">
       <div className="screen__body">
@@ -20,11 +22,12 @@ export function TeamSizeScreen({ onSelect, onBack }: Props) {
               key={size}
               type="button"
               className="btn btn--big"
+              disabled={size > maxSize}
               onClick={() => onSelect(size)}
             >
               {label}
               <span style={{ display: 'block', fontSize: 15, fontWeight: 500, opacity: 0.85 }}>
-                {hint}
+                {size > maxSize ? `ずかんに ${size}たい ひつよう` : hint}
               </span>
             </button>
           ))}

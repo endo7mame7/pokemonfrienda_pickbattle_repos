@@ -56,25 +56,28 @@ PC を起動している間だけ遊べる。
 ```
 npm install
 npm run dev       # 開発サーバー
-npm test          # ルールのユニットテスト（49件）
+npm test          # ユニットテスト（71件）
 npm run typecheck
 npm run build
 ```
 
-### スモークテスト
+### ブラウザでの確認
 
-iPhone SE（375×667）の画面で 1バトルを最後まで自動プレイし、
-こうかばつぐん・つかれ・メガシンカが出ること、画面がはみ出さないことを確かめる。
+iPhone SE（375×667）の画面で実際に動かして確かめる。
 
 ```
 npm run build
-npm run preview &            # http://localhost:4173
-TEAM_SIZE=3 npm run smoke    # 環境により CHROMIUM_PATH=... を付ける
+npm run preview &               # http://localhost:4173
+TEAM_SIZE=3 npm run smoke       # バトルを最後まで自動プレイ
+npm run check:pickbook          # 写真つきの登録と、開き直しても残ること
 ```
+
+環境によっては `CHROMIUM_PATH=/path/to/chrome` を付ける。
 
 ## 開発状況
 
 - 仕様策定（v0.5）… 完了
 - **P0: ルールの土台**（タイプ相性・ダメージ計算・つかれ・メガシンカ・バトル進行 + テスト49件）… 完了
 - **P1: 遊べる最小版**（タイトル → 人数 → チーム → コイントス → バトル → けっか。ずかんは仮データ）… 完了
-- P2: ずかんデータベース（IndexedDB・写真登録・モードえらび）… これから
+- **P2: ずかんデータベース**（IndexedDB・写真登録・モードえらび・まえとおなじ）… 完了
+- P3: PWA 化（オフライン対応・ホーム画面追加の案内）… これから

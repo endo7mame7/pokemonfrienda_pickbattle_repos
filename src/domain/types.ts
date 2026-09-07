@@ -35,6 +35,15 @@ export interface Pick {
   updatedAt: number;
 }
 
+/** 保存しておいたチーム編成 */
+export interface TeamPreset {
+  id: string;
+  name: string;
+  /** 1〜3件の Pick.id */
+  pickIds: string[];
+  updatedAt: number;
+}
+
 /** バトル中のポケモンの状態。永続化しない */
 export interface BattlePokemon {
   pickId: string;
@@ -45,6 +54,8 @@ export interface BattlePokemon {
   hp: number;
   canMegaEvolve: boolean;
   silhouette?: SilhouetteShape;
+  /** 実物ピックの写真。あれば かげ の代わりに表示する */
+  photo?: Blob;
   megaEvolved: boolean;
   /** 全力で攻撃した次のターン。ダメージが半分になる */
   tired: boolean;
