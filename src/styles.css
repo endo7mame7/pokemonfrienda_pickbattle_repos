@@ -259,6 +259,24 @@ body {
   color: var(--p1);
 }
 
+/* いま こうげきする側を はっきりさせる（場所は入れかわらないため） */
+.team-label--turn {
+  font-size: 16px;
+  padding: 3px 14px;
+  border-radius: 999px;
+  align-self: center;
+}
+
+.team-label--turn.team-label--p1 {
+  color: #fff;
+  background: var(--p1);
+}
+
+.team-label--turn.team-label--p2 {
+  color: #fff;
+  background: var(--p2);
+}
+
 .team-label--p2 {
   color: var(--p2);
 }
@@ -811,4 +829,114 @@ body {
 
 .btn--danger {
   background: var(--hp-bad);
+}
+
+/* --- 攻撃エフェクト（docs/SPEC.md §3.10） ---
+   --fx-intensity（0.35〜1.5）で はでさ が変わる */
+.fx {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.fx__ring {
+  position: absolute;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: 5px solid var(--fx-color);
+  animation: fx-ring 620ms ease-out forwards;
+}
+
+.fx__ring--extra {
+  border-color: #ffd24a;
+  animation-delay: 120ms;
+}
+
+.fx__center {
+  position: absolute;
+  font-size: calc(26px + 22px * var(--fx-intensity));
+  animation: fx-center 620ms ease-out forwards;
+}
+
+.fx__particle {
+  position: absolute;
+  font-size: calc(11px + 10px * var(--fx-intensity));
+  transform: rotate(var(--fx-angle));
+  animation: fx-particle 700ms ease-out forwards;
+  animation-delay: var(--fx-delay);
+}
+
+@keyframes fx-ring {
+  from {
+    transform: scale(0.3);
+    opacity: 0.95;
+  }
+  to {
+    transform: scale(calc(1.2 + 1.9 * var(--fx-intensity)));
+    opacity: 0;
+  }
+}
+
+@keyframes fx-center {
+  0% {
+    transform: scale(0.3);
+    opacity: 0;
+  }
+  40% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+}
+
+@keyframes fx-particle {
+  0% {
+    transform: rotate(var(--fx-angle)) translateY(0) scale(0.5);
+    opacity: 0;
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    transform: rotate(var(--fx-angle))
+      translateY(calc(-34px - 46px * var(--fx-intensity))) scale(1);
+    opacity: 0;
+  }
+}
+
+/* 攻撃を受けたカードが ゆれる */
+.card--hit {
+  animation: fx-shake 420ms ease-in-out;
+}
+
+@keyframes fx-shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(calc(-5px * var(--fx-intensity)));
+  }
+  45% {
+    transform: translateX(calc(5px * var(--fx-intensity)));
+  }
+  70% {
+    transform: translateX(calc(-3px * var(--fx-intensity)));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fx__ring,
+  .fx__center,
+  .fx__particle,
+  .card--hit {
+    animation-duration: 1ms;
+  }
 }

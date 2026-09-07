@@ -86,18 +86,18 @@ while (turns < 400) {
     continue;
   }
   if (body.includes('スマホを わたしてね')) { await page.getByText('じゅんび できた').click(); continue; }
+  if (body.includes('こうげき する！')) { await page.getByText('こうげき する！').click(); continue; }
   if (body.includes('ばつぐん！')) sawSuperEffective = true;
   if (body.includes('つかれて はんぶん')) sawTired = true;
 
   if (body.includes('だれで こうげきする')) {
-    const cards = page.locator('.card--selectable');
-    await cards.first().click({ force: true });
+    // こうげきする側・ねらう側を data-role で選び分ける
+    await page.locator('[data-role=attacker] .card--selectable').first().click({ force: true });
     continue;
   }
   if (body.includes('だれを ねらう')) {
-    if (!shotBattle) { await shot('08-battle-select'); }
-    const cards = page.locator('.card--selectable');
-    await cards.first().click({ force: true });
+    if (!shotBattle) { await shot('08-battle-select'); shotBattle = true; }
+    await page.locator('[data-role=target] .card--selectable').first().click({ force: true });
     continue;
   }
   if (body.includes('サイコロを ふろう')) { await page.locator('.dice-button').click({ force: true }); await page.waitForTimeout(900); continue; }

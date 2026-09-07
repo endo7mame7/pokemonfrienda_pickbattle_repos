@@ -173,6 +173,7 @@ export function App() {
       return (
         <HandOffScreen
           playerName={PLAYER_NAMES.p2}
+          passPhone
           onContinue={() => setFlow({ name: 'selectP2', size: flow.size, p1: flow.p1 })}
         />
       );

@@ -21,13 +21,17 @@ function apply(state: BattleState, ...actions: BattleAction[]): BattleState {
   return actions.reduce(battleReducer, state);
 }
 
-/** 攻撃を1回だけ最後まで進める（phase は resolve で止まる） */
+/**
+ * 攻撃を1回だけ最後まで進める（phase は resolve で止まる）。
+ * サイコロを振ったあと、攻撃エフェクトぶんの 'next' でダメージが当たる。
+ */
 function attack(state: BattleState, attackerIndex: number, targetIndex: number, rolls: number[]) {
   return apply(
     state,
     { type: 'selectAttacker', index: attackerIndex },
     { type: 'selectTarget', index: targetIndex },
     { type: 'rollDice', rolls },
+    { type: 'next' },
   );
 }
 
@@ -50,7 +54,8 @@ function opponentTurn(state: BattleState): BattleState {
     { type: 'selectTarget', index: targetIndex },
   );
   const rolls = Array.from({ length: diceCountForTurn(withSelection) }, () => 1);
-  return handOff(battleReducer(withSelection, { type: 'rollDice', rolls }));
+  const hit = apply(withSelection, { type: 'rollDice', rolls }, { type: 'next' });
+  return handOff(hit);
 }
 
 describe('バトルの進行', () => {
@@ -68,6 +73,8 @@ describe('バトルの進行', () => {
     state = battleReducer(state, { type: 'selectTarget', index: 0 });
     expect(state.phase).toBe('rollDice');
     state = battleReducer(state, { type: 'rollDice', rolls: [3] });
+    expect(state.phase).toBe('attacking'); // まだ当たっていない
+    state = battleReducer(state, { type: 'next' });
     expect(state.phase).toBe('resolve');
   });
 
@@ -92,6 +99,40 @@ describe('バトルの進行', () => {
       { type: 'selectAttacker', index: 1 },
     );
     expect(state.selectedAttackerIndex).toBe(1);
+  });
+
+  it('サイコロを振っただけでは、まだ たいりょくは へらない（エフェクトを見せる間）', () => {
+    const state = apply(
+      createBattle([makePick()], [makePick({ energy: 200 })], 'p1', settings),
+      { type: 'selectAttacker', index: 0 },
+      { type: 'selectTarget', index: 0 },
+      { type: 'rollDice', rolls: [3] },
+    );
+    expect(state.phase).toBe('attacking');
+    expect(state.teams.p2[0]!.hp).toBe(200); // まだ当たっていない
+    expect(state.lastResult?.damage).toBe(60); // ダメージは計算ずみ
+
+    // エフェクトが終わってから当たる
+    const hit = battleReducer(state, { type: 'next' });
+    expect(hit.phase).toBe('resolve');
+    expect(hit.teams.p2[0]!.hp).toBe(140);
+  });
+
+  it('エフェクトに使う こうげきタイプ と ねらった相手 が結果に入る', () => {
+    const state = attack(
+      createBattle(
+        [makePick({ type: 'ほのお' })],
+        [makePick(), makePick({ name: 'ねらわれた子' })],
+        'p1',
+        settings,
+      ),
+      0,
+      1,
+      [3],
+    );
+    expect(state.lastResult?.attackerType).toBe('ほのお');
+    expect(state.lastResult?.targetIndex).toBe(1);
+    expect(state.lastResult?.targetName).toBe('ねらわれた子');
   });
 
   it('ダメージが相手のたいりょくから引かれる', () => {
@@ -139,10 +180,14 @@ describe('バトルの進行', () => {
     expect(state.selectedAttackerIndex).toBe(1);
 
     // p1 の手番に戻すと、たおした相手はもう狙えない
-    state = handOff(battleReducer(battleReducer(state, { type: 'selectTarget', index: 0 }), {
-      type: 'rollDice',
-      rolls: [1],
-    }));
+    state = handOff(
+      apply(
+        state,
+        { type: 'selectTarget', index: 0 },
+        { type: 'rollDice', rolls: [1] },
+        { type: 'next' }, // 攻撃エフェクトぶん
+      ),
+    );
     expect(state.turnPlayer).toBe('p1');
     const afterTarget = apply(
       state,
@@ -324,6 +369,8 @@ describe('1バトルを最後まで完走できる（P0の完了条件）', () =
         // できるときは必ず メガシンカ する
         state = battleReducer(state, { type: 'megaEvolve' });
       } else if (state.phase === 'megaEvolving') {
+        state = battleReducer(state, { type: 'next' });
+      } else if (state.phase === 'attacking') {
         state = battleReducer(state, { type: 'next' });
       } else if (state.phase === 'selectAttacker') {
         const team = state.teams[state.turnPlayer];

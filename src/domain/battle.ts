@@ -3,7 +3,7 @@ import { diceCountFor } from './dice';
 import { updateFatigue } from './fatigue';
 import { findMegaCandidateIndex } from './megaEvolution';
 import { OPPONENT_OF } from './types';
-import type { BattlePokemon, Pick, PlayerId, Settings } from './types';
+import type { BattlePokemon, Pick, PlayerId, PokemonType, Settings } from './types';
 
 export type BattlePhase =
   /** メガシンカ できる子がいる。する / しない を選ぶ */
@@ -13,6 +13,8 @@ export type BattlePhase =
   | 'selectAttacker'
   | 'selectTarget'
   | 'rollDice'
+  /** サイコロは出たが、まだ当たっていない。攻撃エフェクトを見せる */
+  | 'attacking'
   | 'resolve'
   | 'handOff'
   | 'finished';
@@ -20,7 +22,11 @@ export type BattlePhase =
 /** 1回の攻撃の結果。演出と読み上げに使う */
 export interface TurnResult {
   attackerName: string;
+  /** 攻撃エフェクトの見た目に使う */
+  attackerType: PokemonType;
   targetName: string;
+  /** エフェクトを出す位置に使う */
+  targetIndex: number;
   rolls: number[];
   damage: number;
   isSuperEffective: boolean;
@@ -187,13 +193,11 @@ export function battleReducer(state: BattleState, action: BattleAction): BattleS
       const targetIndex = state.selectedTargetIndex;
       if (attackerIndex === null || targetIndex === null) return state;
 
-      const teams = cloneTeams(state.teams);
-      const attackerTeam = teams[state.turnPlayer];
-      const defenderTeam = teams[OPPONENT_OF[state.turnPlayer]];
-      const attacker = attackerTeam[attackerIndex];
-      const target = defenderTeam[targetIndex];
+      const attacker = state.teams[state.turnPlayer][attackerIndex];
+      const target = state.teams[OPPONENT_OF[state.turnPlayer]][targetIndex];
       if (!attacker || !target) return state;
 
+      // ここでは当てない。攻撃エフェクトを見せてから当てる
       const { damage, isSuperEffective, isTired } = calcDamage(
         attacker,
         target,
@@ -201,31 +205,52 @@ export function battleReducer(state: BattleState, action: BattleAction): BattleS
         state.settings,
       );
 
-      target.hp = Math.max(0, target.hp - damage);
-      attacker.damageDealt += damage;
-
-      if (state.settings.fatigueEnabled) {
-        updateFatigue(attackerTeam, attackerIndex, isTired);
-      }
-      // メガシンカはここでは起こさない。やられた側が自分のターンのはじめに選ぶ
-
       return {
         ...state,
-        teams,
-        phase: 'resolve',
+        phase: 'attacking',
         lastResult: {
           attackerName: attacker.name,
+          attackerType: attacker.type,
           targetName: target.name,
+          targetIndex,
           rolls: action.rolls,
           damage,
           isSuperEffective,
           isTired,
-          targetFainted: target.hp === 0,
+          targetFainted: false,
         },
       };
     }
 
     case 'next': {
+      // 攻撃エフェクトが終わった。ここでダメージが当たる
+      if (state.phase === 'attacking') {
+        const result = state.lastResult;
+        const attackerIndex = state.selectedAttackerIndex;
+        if (!result || attackerIndex === null) return state;
+
+        const teams = cloneTeams(state.teams);
+        const attackerTeam = teams[state.turnPlayer];
+        const attacker = attackerTeam[attackerIndex];
+        const target = teams[OPPONENT_OF[state.turnPlayer]][result.targetIndex];
+        if (!attacker || !target) return state;
+
+        target.hp = Math.max(0, target.hp - result.damage);
+        attacker.damageDealt += result.damage;
+
+        if (state.settings.fatigueEnabled) {
+          updateFatigue(attackerTeam, attackerIndex, result.isTired);
+        }
+        // メガシンカはここでは起こさない。やられた側が自分のターンのはじめに選ぶ
+
+        return {
+          ...state,
+          teams,
+          phase: 'resolve',
+          lastResult: { ...result, targetFainted: target.hp === 0 },
+        };
+      }
+
       if (state.phase === 'resolve') {
         const defenderTeam = state.teams[OPPONENT_OF[state.turnPlayer]];
         if (isTeamWipedOut(defenderTeam)) {
