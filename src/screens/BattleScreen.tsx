@@ -24,7 +24,12 @@ interface Props {
 }
 
 const ROLL_ANIMATION_MS = 700;
+const ATTACK_EFFECT_MS = 780;
 const MEGA_ANIMATION_MS = 2400;
+
+/** 対面で遊ぶので、チームの場所は入れかわらない。あかは上、あおは下で固定 */
+const TOP: PlayerId = 'p1';
+const BOTTOM: PlayerId = 'p2';
 
 export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFinish }: Props) {
   const [state, dispatch] = useReducer(
@@ -40,6 +45,13 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
     if (state.phase === 'finished') onFinish(state);
   }, [state, onFinish]);
 
+  // 攻撃エフェクトを見せてから、ダメージを当てる
+  useEffect(() => {
+    if (state.phase !== 'attacking') return undefined;
+    const timer = window.setTimeout(() => dispatch({ type: 'next' }), ATTACK_EFFECT_MS);
+    return () => window.clearTimeout(timer);
+  }, [state.phase]);
+
   // メガシンカの演出は、見せてから自動で次に進む
   useEffect(() => {
     if (state.phase !== 'megaEvolving') return undefined;
@@ -47,16 +59,16 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
     return () => window.clearTimeout(timer);
   }, [state.phase]);
 
-  const me = state.turnPlayer;
-  const foe = OPPONENT_OF[me];
-  const myTeam = state.teams[me];
-  const foeTeam = state.teams[foe];
+  const attackerSide = state.turnPlayer;
+  const targetSide = OPPONENT_OF[state.turnPlayer];
   const result = state.lastResult;
   const megaCandidate =
-    state.megaCandidateIndex === null ? null : (myTeam[state.megaCandidateIndex] ?? null);
+    state.megaCandidateIndex === null
+      ? null
+      : (state.teams[attackerSide][state.megaCandidateIndex] ?? null);
 
   const chooseAttacker = (index: number) => {
-    const pokemon = myTeam[index];
+    const pokemon = state.teams[attackerSide][index];
     if (!pokemon || !isAlive(pokemon)) return;
     if (settings.fatigueEnabled && pokemon.tired) {
       setTiredConfirmIndex(index);
@@ -74,15 +86,18 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
     }, ROLL_ANIMATION_MS);
   };
 
+  const turnName = playerNames[attackerSide];
   const message = (() => {
     if (rolling) return 'サイコロ ころころ…';
     switch (state.phase) {
       case 'selectAttacker':
-        return 'だれで こうげきする？';
+        return `${turnName}の ばん。だれで こうげきする？`;
       case 'selectTarget':
         return 'だれを ねらう？';
       case 'rollDice':
         return 'サイコロを ふろう！';
+      case 'attacking':
+        return `${result?.attackerName}の こうげき！`;
       case 'resolve':
         return result?.targetFainted ? `${result.targetName}は たおれた！` : '';
       default:
@@ -90,25 +105,66 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
     }
   })();
 
-  const selectableMine = !rolling && (state.phase === 'selectAttacker' || state.phase === 'selectTarget');
-  const selectableFoe = !rolling && (state.phase === 'selectTarget' || state.phase === 'rollDice');
+  const canPickAttacker =
+    !rolling && (state.phase === 'selectAttacker' || state.phase === 'selectTarget');
+  const canPickTarget = !rolling && (state.phase === 'selectTarget' || state.phase === 'rollDice');
+
+  const renderTeam = (side: PlayerId) => {
+    const isAttackerSide = side === attackerSide;
+    const selectable = isAttackerSide ? canPickAttacker : canPickTarget;
+    // 攻撃する側を選んでいる間は、相手側を暗くする（どっちを選ぶのか迷わないように）
+    const dimmed = isAttackerSide ? canPickTarget && !canPickAttacker : canPickAttacker && !canPickTarget;
+
+    return (
+      // いま こうげきする側か、ねらわれる側かを持たせる
+      <div className="team" data-side={side} data-role={isAttackerSide ? 'attacker' : 'target'}>
+        {state.teams[side].map((pokemon, index) => (
+          <PokemonCard
+            key={pokemon.pickId + index}
+            pokemon={pokemon}
+            selectable={selectable && isAlive(pokemon)}
+            selected={
+              isAttackerSide
+                ? state.selectedAttackerIndex === index
+                : state.selectedTargetIndex === index
+            }
+            dimmed={dimmed}
+            hit={
+              state.phase === 'attacking' &&
+              result &&
+              side === targetSide &&
+              result.targetIndex === index
+                ? {
+                    type: result.attackerType,
+                    damage: result.damage,
+                    isSuperEffective: result.isSuperEffective,
+                  }
+                : undefined
+            }
+            onSelect={() =>
+              isAttackerSide
+                ? chooseAttacker(index)
+                : dispatch({ type: 'selectTarget', index })
+            }
+          />
+        ))}
+      </div>
+    );
+  };
+
+  const teamLabel = (side: PlayerId) => (
+    <div
+      className={`team-label team-label--${side}${side === attackerSide ? ' team-label--turn' : ''}`}
+    >
+      {playerNames[side]}チーム{side === attackerSide ? '（いま こうげき）' : ''}
+    </div>
+  );
 
   return (
     <div className="screen">
       <div className="screen__body">
-        <div className={`team-label team-label--${foe}`}>あいて（{playerNames[foe]}）</div>
-        <div className="team">
-          {foeTeam.map((pokemon, index) => (
-            <PokemonCard
-              key={pokemon.pickId + index}
-              pokemon={pokemon}
-              selectable={selectableFoe && isAlive(pokemon)}
-              selected={state.selectedTargetIndex === index}
-              dimmed={selectableMine && !selectableFoe}
-              onSelect={() => dispatch({ type: 'selectTarget', index })}
-            />
-          ))}
-        </div>
+        {teamLabel(TOP)}
+        {renderTeam(TOP)}
 
         <div
           className={
@@ -130,7 +186,7 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
             </button>
           )}
 
-          {state.phase === 'resolve' && result && (
+          {(state.phase === 'attacking' || state.phase === 'resolve') && result && (
             <>
               <Dice values={result.rolls} rolling={false} />
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center' }}>
@@ -141,8 +197,13 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
                 )}
                 {result.isTired && <span className="badge badge--tired">💤 つかれて はんぶん</span>}
               </div>
-              <div className="damage">-{result.damage}</div>
-              <div className="tap-hint">タップして つぎへ 👆</div>
+              {/* ダメージの数は、エフェクトが終わってから出す */}
+              {state.phase === 'resolve' && (
+                <>
+                  <div className="damage">-{result.damage}</div>
+                  <div className="tap-hint">タップして つぎへ 👆</div>
+                </>
+              )}
             </>
           )}
 
@@ -159,19 +220,8 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
             )}
         </div>
 
-        <div className="team">
-          {myTeam.map((pokemon, index) => (
-            <PokemonCard
-              key={pokemon.pickId + index}
-              pokemon={pokemon}
-              selectable={selectableMine && isAlive(pokemon)}
-              selected={state.selectedAttackerIndex === index}
-              dimmed={selectableFoe && !selectableMine}
-              onSelect={() => chooseAttacker(index)}
-            />
-          ))}
-        </div>
-        <div className={`team-label team-label--${me}`}>じぶん（{playerNames[me]}）</div>
+        {renderTeam(BOTTOM)}
+        {teamLabel(BOTTOM)}
       </div>
 
       {tiredConfirmIndex !== null && (
@@ -179,7 +229,7 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
           <div className="overlay__panel">
             <div style={{ fontSize: 48 }}>💤</div>
             <div className="overlay__title" style={{ fontSize: 22 }}>
-              {myTeam[tiredConfirmIndex]?.name}は つかれてるよ
+              {state.teams[attackerSide][tiredConfirmIndex]?.name}は つかれてるよ
             </div>
             <p style={{ margin: 0 }}>ダメージが はんぶんに なるけど、それでも いい？</p>
             <button
@@ -209,6 +259,7 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
             <Silhouette
               name={megaCandidate.name}
               type={megaCandidate.type}
+              shape={megaCandidate.silhouette}
               size={92}
               key={megaCandidate.name}
             />
@@ -235,7 +286,12 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
           <div className="mega-stage">
             <div className="mega-stage__glow">
               <div className="mega-stage__figure">
-                <Silhouette name={megaCandidate.name} type={megaCandidate.type} size={110} />
+                <Silhouette
+                  name={megaCandidate.name}
+                  type={megaCandidate.type}
+                  shape={megaCandidate.silhouette}
+                  size={110}
+                />
               </div>
             </div>
             <div className="mega-stage__title">🌈 メガシンカ！</div>
@@ -249,7 +305,7 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
 
       {state.phase === 'handOff' && (
         <HandOffScreen
-          playerName={playerNames[foe]}
+          playerName={playerNames[targetSide]}
           onContinue={() => dispatch({ type: 'next' })}
         />
       )}
