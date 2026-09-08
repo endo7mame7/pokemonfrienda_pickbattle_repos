@@ -5,7 +5,7 @@ import type { MoveKind } from './moves';
 import { judgeTiming } from './timing';
 import type { TimingResult } from './timing';
 import { diceCountFor } from './dice';
-import { updateFatigue } from './fatigue';
+import { clearFatigueIfAlone, updateFatigue } from './fatigue';
 import { findMegaCandidateIndex } from './megaEvolution';
 import { OPPONENT_OF } from './types';
 import type { BattlePokemon, Pick, PlayerId, PokemonType, Settings } from './types';
@@ -194,9 +194,14 @@ function resolveAttack(state: BattleState, input: AttackInput): BattleState {
 
 /** ターンのはじめ。メガシンカ できる子がいれば、まずそれを聞く */
 function startTurn(state: BattleState, turnPlayer: PlayerId): BattleState {
-  const megaCandidateIndex = findMegaCandidateIndex(state.teams[turnPlayer], state.settings);
+  const teams = cloneTeams(state.teams);
+  // 仲間がたおれて1体だけになったら、つかれは消す（もう交代できないため）
+  if (state.settings.fatigueEnabled) clearFatigueIfAlone(teams[turnPlayer]);
+
+  const megaCandidateIndex = findMegaCandidateIndex(teams[turnPlayer], state.settings);
   return {
     ...state,
+    teams,
     turnPlayer,
     phase: megaCandidateIndex === null ? 'selectAttacker' : 'megaPrompt',
     megaCandidateIndex,
@@ -323,7 +328,7 @@ export function battleReducer(state: BattleState, action: BattleAction): BattleS
         attacker.damageDealt += result.damage;
 
         if (state.settings.fatigueEnabled) {
-          updateFatigue(attackerTeam, attackerIndex, result.isTired);
+          updateFatigue(attackerTeam, attackerIndex);
         }
         // メガシンカはここでは起こさない。やられた側が自分のターンのはじめに選ぶ
 

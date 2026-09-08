@@ -37,11 +37,11 @@ await page.getByText('みほんの 12たいを いれる').click();
 await page.getByText('もどる').click();
 await page.locator('.mode').first().click();
 await page.getByText('1たい1').click();
-// メガシンカ できて たいりょくが ひくい子
-await page.getByText('サーナイト', { exact: true }).click();
+// メガシンカ できて、一撃ではたおれない子
+await page.getByText('リザードン', { exact: true }).click();
 await page.getByText('けってい').click();
 await page.getByText('じゅんび できた').click();
-await page.getByText('サーナイト', { exact: true }).click();
+await page.getByText('リザードン', { exact: true }).click();
 await page.getByText('けってい').click();
 await page.getByText('コインを なげる').click();
 await page.waitForTimeout(1500);
@@ -56,7 +56,8 @@ for (let i = 0; i < 400 && mashFill === null; i += 1) {
   const body = await page.locator('body').innerText();
   if (body.includes('の かち！')) break;
 
-  if (body.includes('こうげき する！')) { await page.getByText('こうげき する！').click(); continue; }
+  // 手番が変わったら スマホを わたす
+  if (body.includes('スマホを わたしてね')) { await page.getByText('じゅんび できた').click(); continue; }
   if (body.includes('つかれてるよ')) { await page.getByText('これで いく').click(); continue; }
   if (body.includes('メガシンカ できる！')) {
     sawPrompt = true;
@@ -85,7 +86,7 @@ for (let i = 0; i < 400 && mashFill === null; i += 1) {
       await shot('43-move-choice-with-mega');
       await mega.click();
     } else {
-      await page.locator('.move-btn').nth(1).click();
+      await page.locator('.move-btn').nth(0).click(); // ふつう わざ（一撃でたおさない）
     }
     continue;
   }

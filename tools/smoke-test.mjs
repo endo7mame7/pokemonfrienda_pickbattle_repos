@@ -93,7 +93,6 @@ while (turns < 900) {
     continue;
   }
   if (body.includes('スマホを わたしてね')) { await page.getByText('じゅんび できた').click(); continue; }
-  if (body.includes('こうげき する！')) { await page.getByText('こうげき する！').click(); continue; }
   if (body.includes('ばつぐん！')) sawSuperEffective = true;
   if (body.includes('つかれて')) sawTired = true;
 

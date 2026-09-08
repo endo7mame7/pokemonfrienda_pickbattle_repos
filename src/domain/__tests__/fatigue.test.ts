@@ -1,54 +1,76 @@
 import { describe, expect, it } from 'vitest';
-import { updateFatigue } from '../fatigue';
+import { clearFatigueIfAlone, updateFatigue } from '../fatigue';
 import { makePokemon } from './testHelpers';
 
 describe('updateFatigue（docs/SPEC.md §3.7）', () => {
-  it('全力で攻撃した子は つかれる', () => {
-    const team = [makePokemon({ name: 'A' }), makePokemon({ name: 'B' })];
-    updateFatigue(team, 0, false);
+  const team3 = () => [
+    makePokemon({ name: 'A' }),
+    makePokemon({ name: 'B' }),
+    makePokemon({ name: 'C' }),
+  ];
+
+  it('攻撃した子は つかれる', () => {
+    const team = team3();
+    updateFatigue(team, 0);
     expect(team[0]!.tired).toBe(true);
   });
 
-  it('つかれた状態で攻撃した子は 元気に戻る', () => {
-    const team = [makePokemon({ name: 'A', tired: true })];
-    updateFatigue(team, 0, true);
-    expect(team[0]!.tired).toBe(false);
-  });
-
   it('攻撃しなかった（休んだ）子は 元気に戻る', () => {
-    const team = [makePokemon({ name: 'A' }), makePokemon({ name: 'B', tired: true })];
-    updateFatigue(team, 0, false);
+    const team = team3();
+    team[1]!.tired = true;
+    updateFatigue(team, 0);
     expect(team[1]!.tired).toBe(false);
   });
 
-  it('1体だけのとき（1vs1）は ぜんりょく → はんぶん → ぜんりょく と交互になる', () => {
-    const team = [makePokemon()];
-    const history: boolean[] = [];
-    for (let turn = 0; turn < 6; turn += 1) {
-      const wasTired = team[0]!.tired;
-      history.push(wasTired);
-      updateFatigue(team, 0, wasTired);
-    }
-    expect(history).toEqual([false, true, false, true, false, true]);
+  it('つかれたまま攻撃しても、つかれは とれない', () => {
+    const team = team3();
+    team[0]!.tired = true;
+    updateFatigue(team, 0);
+    expect(team[0]!.tired).toBe(true);
   });
 
-  it('3体を順番に交代して使えば、だれも つかれた状態で攻撃しない', () => {
-    const team = [makePokemon({ name: 'A' }), makePokemon({ name: 'B' }), makePokemon({ name: 'C' })];
+  it('順番に交代して使えば、だれも つかれた状態で攻撃しない', () => {
+    const team = team3();
     for (let turn = 0; turn < 9; turn += 1) {
       const index = turn % 3;
       expect(team[index]!.tired).toBe(false);
-      updateFatigue(team, index, team[index]!.tired);
+      updateFatigue(team, index);
     }
   });
 
-  it('同じ子を連打すると、半分の攻撃が交互に混ざる', () => {
-    const team = [makePokemon({ name: 'A' }), makePokemon({ name: 'B' })];
-    const tiredAttacks: boolean[] = [];
-    for (let turn = 0; turn < 6; turn += 1) {
-      const wasTired = team[0]!.tired;
-      tiredAttacks.push(wasTired);
-      updateFatigue(team, 0, wasTired);
+  it('同じ子を連打すると、2回目からは ずっと つかれたまま', () => {
+    const team = team3();
+    const tiredAtAttack: boolean[] = [];
+    for (let turn = 0; turn < 5; turn += 1) {
+      tiredAtAttack.push(team[0]!.tired);
+      updateFatigue(team, 0);
     }
-    expect(tiredAttacks.filter(Boolean)).toHaveLength(3);
+    expect(tiredAtAttack).toEqual([false, true, true, true, true]);
+  });
+});
+
+describe('交代できないときは つかれない', () => {
+  it('戦える子が1体だけなら、攻撃しても つかれない', () => {
+    const team = [makePokemon()];
+    updateFatigue(team, 0);
+    expect(team[0]!.tired).toBe(false);
+  });
+
+  it('仲間がたおれて1体だけになったら、ついていた つかれも消える', () => {
+    const team = [makePokemon({ name: 'A', tired: true }), makePokemon({ name: 'B', hp: 0 })];
+    clearFatigueIfAlone(team);
+    expect(team[0]!.tired).toBe(false);
+  });
+
+  it('まだ2体いるなら、つかれは そのまま', () => {
+    const team = [makePokemon({ name: 'A', tired: true }), makePokemon({ name: 'B' })];
+    clearFatigueIfAlone(team);
+    expect(team[0]!.tired).toBe(true);
+  });
+
+  it('ひんしの子は かぞえない', () => {
+    const team = [makePokemon({ name: 'A' }), makePokemon({ name: 'B', hp: 0 })];
+    updateFatigue(team, 0);
+    expect(team[0]!.tired).toBe(false);
   });
 });

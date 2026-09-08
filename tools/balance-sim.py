@@ -106,10 +106,14 @@ def battle(multiplier, size, bonus=DEFAULT_BONUS, mega=DEFAULT_MEGA,
         if was_tired:
             damage = ceil_to_10(damage // 2)
         if fatigue:
-            # 攻撃した子は「全力ならつかれる / つかれていたら回復」、
-            # 休んだ子は回復する
-            for p in teams[side]:
-                p['tired'] = (not was_tired) if p is attacker else False
+            # 攻撃した子は つかれる。休んだ子だけ 回復する。
+            # 戦える子が1体だけなら 交代できないので つかれない
+            if sum(1 for p in teams[side] if p['hp'] > 0) >= 2:
+                for p in teams[side]:
+                    p['tired'] = p is attacker
+            else:
+                for p in teams[side]:
+                    p['tired'] = False
 
         target['hp'] = max(0, target['hp'] - damage)
         # ダメージ適用後に、受けた側のメガシンカを判定する（ひんしなら発動しない）
@@ -194,8 +198,14 @@ def timing_battle(size, speed='normal', skill=SKILL['園児'], strong_rate=0.45,
         damage = ceil_to_10(int(damage))
 
         if fatigue:
-            for p in teams[side]:
-                p['tired'] = (not was_tired) if p is attacker else False
+            # 攻撃した子は つかれる。休んだ子だけ 回復する。
+            # 戦える子が1体だけなら 交代できないので つかれない
+            if sum(1 for p in teams[side] if p['hp'] > 0) >= 2:
+                for p in teams[side]:
+                    p['tired'] = p is attacker
+            else:
+                for p in teams[side]:
+                    p['tired'] = False
 
         target['hp'] = max(0, target['hp'] - damage)
         if (mega is not None and target['can_mega'] and not target['mega']

@@ -56,7 +56,8 @@ for (let i = 0; i < 900; i += 1) {
   const body = await page.locator('body').innerText();
   if (body.includes('の かち！')) { decided = true; break; }
 
-  if (body.includes('こうげき する！')) { await page.getByText('こうげき する！').click(); continue; }
+  // 手番が変わったら スマホを わたす
+  if (body.includes('スマホを わたしてね')) { await page.getByText('じゅんび できた').click(); continue; }
   if (body.includes('つかれてるよ')) { await page.getByText('これで いく').click(); continue; }
   if (body.includes('メガシンカ できる！')) {
     await page.getByText('メガシンカ する！').click();

@@ -321,8 +321,14 @@ describe('バトルの進行', () => {
     expect(state.megaCandidateIndex).toBe(1);
   });
 
-  it('つかれた状態で攻撃するとダメージが半分になる', () => {
-    let state = createBattle([makePick()], [makePick({ energy: 350 })], 'p1', settings);
+  it('つかれた状態で攻撃するとダメージが半分になる（サイコロ方式）', () => {
+    // つかれは 交代できるとき だけ。2体いる状態で ためす
+    let state = createBattle(
+      [makePick(), makePick()],
+      [makePick({ energy: 350 })],
+      'p1',
+      settings,
+    );
     state = attack(state, 0, 0, [3]); // 全力 60
     expect(state.lastResult?.damage).toBe(60);
     expect(state.teams.p1[0]!.tired).toBe(true);
@@ -331,7 +337,39 @@ describe('バトルの進行', () => {
     state = attack(state, 0, 0, [3]); // つかれて 30
     expect(state.lastResult?.damage).toBe(30);
     expect(state.lastResult?.isTired).toBe(true);
-    expect(state.teams.p1[0]!.tired).toBe(false); // 攻撃後は元気に戻る
+    // つかれは 休まないと とれない
+    expect(state.teams.p1[0]!.tired).toBe(true);
+  });
+
+  it('つかれは 休んだときだけ とれる', () => {
+    let state = createBattle(
+      [makePick({ name: 'A' }), makePick({ name: 'B' })],
+      [makePick({ energy: 350 })],
+      'p1',
+      settings,
+    );
+    state = opponentTurn(attack(state, 0, 0, [1])); // A が攻撃 → つかれる
+    expect(state.teams.p1[0]!.tired).toBe(true);
+
+    state = opponentTurn(attack(state, 1, 0, [1])); // B が攻撃 → A は休んで回復
+    expect(state.teams.p1[0]!.tired).toBe(false);
+    expect(state.teams.p1[1]!.tired).toBe(true);
+  });
+
+  it('1体だけになったら つかれない（交代できないため）', () => {
+    let state = createBattle(
+      [makePick(), makePick({ energy: 10 })],
+      [makePick({ energy: 350 })],
+      'p1',
+      settings,
+    );
+    state = opponentTurn(attack(state, 0, 0, [3]));
+    expect(state.teams.p1[0]!.tired).toBe(true); // まだ2体いるので つかれる
+
+    // 2体目を たおして 1体だけにする
+    state.teams.p1[1]!.hp = 0;
+    state = opponentTurn(attack(state, 0, 0, [3]));
+    expect(state.teams.p1[0]!.tired).toBe(false);
   });
 
   it('MVP はいちばん多くダメージを与えた子', () => {
