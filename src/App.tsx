@@ -11,8 +11,9 @@ import {
 import type { PickInput, PickSort } from './db/pickRepository';
 import { loadLastTeams, saveLastTeams } from './db/keyValueRepository';
 import type { LastTeams } from './db/keyValueRepository';
+import { loadSettings, saveSettings } from './db/settingsRepository';
 import { DEFAULT_SETTINGS } from './domain';
-import type { BattleState, Pick, PlayerId } from './domain';
+import type { BattleState, Pick, PlayerId, Settings } from './domain';
 import { BattleScreen } from './screens/BattleScreen';
 import { CoinTossScreen } from './screens/CoinTossScreen';
 import { HandOffScreen } from './screens/HandOffScreen';
@@ -20,6 +21,7 @@ import { PickBookScreen } from './screens/PickBookScreen';
 import { PickFormScreen } from './screens/PickFormScreen';
 import { ResultScreen } from './screens/ResultScreen';
 import { SelectTeamScreen } from './screens/SelectTeamScreen';
+import { SettingsScreen } from './screens/SettingsScreen';
 import { TeamSizeScreen } from './screens/TeamSizeScreen';
 import { TitleScreen } from './screens/TitleScreen';
 
@@ -29,6 +31,7 @@ const PLAYER_NAMES: Record<PlayerId, string> = { p1: 'あか', p2: 'あお' };
 type Flow =
   | { name: 'title' }
   | { name: 'pickBook' }
+  | { name: 'settings' }
   | { name: 'pickForm'; pick?: Pick }
   | { name: 'teamSize' }
   | { name: 'selectP1'; size: number }
@@ -43,8 +46,8 @@ export function App() {
   const [picks, setPicks] = useState<Pick[]>([]);
   const [sort, setSort] = useState<PickSort>('useCount');
   const [lastTeams, setLastTeams] = useState<LastTeams>({});
+  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [loaded, setLoaded] = useState(false);
-  const settings = DEFAULT_SETTINGS;
 
   const reload = useCallback(async (nextSort: PickSort) => {
     setPicks(await listPicks(nextSort));
@@ -54,6 +57,7 @@ export function App() {
     void (async () => {
       await reload(sort);
       setLastTeams(await loadLastTeams());
+      setSettings(await loadSettings());
       setLoaded(true);
     })();
   }, [reload, sort]);
@@ -77,6 +81,11 @@ export function App() {
     },
     [reload, sort],
   );
+
+  const changeSettings = useCallback((next: Settings) => {
+    setSettings(next);
+    void saveSettings(next);
+  }, []);
 
   const savePickInput = useCallback(
     async (input: PickInput, existing?: Pick) => {
@@ -106,6 +115,16 @@ export function App() {
             setFlow(picks.length === 0 ? { name: 'pickBook' } : { name: 'teamSize' })
           }
           onPickBook={() => setFlow({ name: 'pickBook' })}
+          onSettings={() => setFlow({ name: 'settings' })}
+        />
+      );
+
+    case 'settings':
+      return (
+        <SettingsScreen
+          settings={settings}
+          onChange={changeSettings}
+          onBack={() => setFlow({ name: 'title' })}
         />
       );
 

@@ -1,10 +1,12 @@
 import { useEffect, useLayoutEffect, useReducer, useRef, useState } from 'react';
 import { AttackAnimation } from '../components/AttackAnimation';
+import { TimingGauge } from '../components/TimingGauge';
 import type { AttackPath } from '../components/AttackAnimation';
 import { Dice } from '../components/Dice';
 import { PokemonCard } from '../components/PokemonCard';
 import { Silhouette } from '../components/Silhouette';
 import {
+  MOVE_NAMES,
   battleReducer,
   createBattle,
   diceCountForTurn,
@@ -13,7 +15,8 @@ import {
   rollDice,
   OPPONENT_OF,
 } from '../domain';
-import type { BattleState, Pick, PlayerId, Settings } from '../domain';
+import type { BattleState, MoveKind, Pick, PlayerId, Settings } from '../domain';
+import { TYPE_COLORS } from '../ui/typeColors';
 import { HandOffScreen } from './HandOffScreen';
 
 interface Props {
@@ -92,6 +95,10 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
   const attackerSide = state.turnPlayer;
   const targetSide = OPPONENT_OF[state.turnPlayer];
   const result = state.lastResult;
+  const attackerPokemon =
+    state.selectedAttackerIndex === null
+      ? null
+      : (state.teams[attackerSide][state.selectedAttackerIndex] ?? null);
   const megaCandidate =
     state.megaCandidateIndex === null
       ? null
@@ -126,8 +133,12 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
         return 'だれを ねらう？';
       case 'rollDice':
         return 'サイコロを ふろう！';
+      case 'chooseMove':
+        return 'どの わざに する？';
+      case 'timing':
+        return 'まんなかで とめよう！';
       case 'attacking':
-        return `${result?.attackerName}の こうげき！`;
+        return `${result?.attackerName}の ${result?.moveName}！`;
       case 'resolve':
         return result?.targetFainted ? `${result.targetName}は たおれた！` : '';
       default:
@@ -201,6 +212,33 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
         >
           <div className="message">{message}</div>
 
+          {state.phase === 'chooseMove' && attackerPokemon && (
+            <div className="move-row">
+              {(['normal', 'strong'] as MoveKind[]).map((move) => (
+                <button
+                  key={move}
+                  type="button"
+                  className="move-btn"
+                  style={{ background: TYPE_COLORS[attackerPokemon.type] }}
+                  onClick={() => dispatch({ type: 'chooseMove', move })}
+                >
+                  {MOVE_NAMES[attackerPokemon.type][move]}
+                  <span className="move-btn__sub">
+                    {move === 'normal' ? 'あてやすい' : 'つよいけど むずかしい'}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {state.phase === 'timing' && state.selectedMove && attackerPokemon && (
+            <TimingGauge
+              move={state.selectedMove}
+              type={attackerPokemon.type}
+              onStop={(position) => dispatch({ type: 'stopTiming', position })}
+            />
+          )}
+
           {(state.phase === 'rollDice' || rolling) && (
             <button
               type="button"
@@ -215,7 +253,14 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
 
           {(state.phase === 'attacking' || state.phase === 'resolve') && result && (
             <>
-              <Dice values={result.rolls} rolling={false} small />
+              {result.rolls && <Dice values={result.rolls} rolling={false} small />}
+              {result.timing && (
+                <div className={`timing-result timing-result--${result.timing}`}>
+                  {result.timing === 'perfect' && '🎯 ぴったり！ 2ばい'}
+                  {result.timing === 'near' && '⭕ ちかい！'}
+                  {result.timing === 'miss' && '💦 はずれ… はんぶん'}
+                </div>
+              )}
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center' }}>
                 {result.isSuperEffective && (
                   <span className="badge badge--super">
@@ -229,7 +274,9 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
             </>
           )}
 
-          {(state.phase === 'selectAttacker' || state.phase === 'selectTarget') &&
+          {(state.phase === 'selectAttacker' ||
+            state.phase === 'selectTarget' ||
+            state.phase === 'chooseMove') &&
             !rolling &&
             state.selectedAttackerIndex !== null && (
               <button

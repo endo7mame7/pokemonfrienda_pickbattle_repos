@@ -129,6 +129,58 @@ def _stats(**kwargs):
     return statistics.mean(turns), max(turns)
 
 
+# ── タイミング方式（docs/SPEC.md §3.4）
+MOVE_POWER = {'normal': 110, 'strong': 190}
+SPEED_SCALE = {'fast': 1.4, 'normal': 1.0, 'slow': 0.7}
+TIMING_MULT = {'perfect': 2.0, 'near': 1.0, 'miss': 0.5}
+# 園児の うでまえ の想定（ぴったり / ちかい の確率）
+SKILL = {'園児': (0.15, 0.50), '大人': (0.35, 0.55)}
+
+
+def timing_battle(size, speed='normal', skill=SKILL['園児'], strong_rate=0.45,
+                  bonus=DEFAULT_BONUS, mega=DEFAULT_MEGA, fatigue=DEFAULT_FATIGUE):
+    """タイミング方式で1バトルを進めて、かかったターン数を返す。"""
+    teams = [_make_team(size), _make_team(size)]
+    turns = 0
+    side = 0
+    perfect, near = skill
+    while all(any(p['hp'] > 0 for p in t) for t in teams):
+        turns += 1
+        alive = [p for p in teams[side] if p['hp'] > 0]
+        fresh = [p for p in alive if not p['tired']]
+        attacker = fresh[0] if fresh else alive[0]
+        target = next(p for p in teams[1 - side] if p['hp'] > 0)
+
+        move = 'strong' if random.random() < strong_rate else 'normal'
+        r = random.random()
+        result = 'perfect' if r < perfect else ('near' if r < perfect + near else 'miss')
+
+        damage = MOVE_POWER[move] * SPEED_SCALE[speed] * TIMING_MULT[result]
+        if attacker['mega']:
+            damage *= 1.5
+        if target['type'] in CHART[attacker['type']]:
+            damage += bonus
+        was_tired = fatigue and attacker['tired']
+        if was_tired:
+            damage /= 2
+        damage = ceil_to_10(int(damage))
+
+        if fatigue:
+            for p in teams[side]:
+                p['tired'] = (not was_tired) if p is attacker else False
+
+        target['hp'] = max(0, target['hp'] - damage)
+        if (mega is not None and target['can_mega'] and not target['mega']
+                and target['hp'] > 0
+                and target['hp'] * mega[1] <= target['max'] * mega[0]):
+            target['mega'] = True
+
+        side = 1 - side
+        if turns > 3000:
+            break
+    return turns
+
+
 def main():
     rate = sum(1 for a in TYPES for b in TYPES if b in CHART[a]) / len(TYPES) ** 2
     print(f"こうかばつぐん発生率: {rate:.1%}（ランダムなタイプ同士の場合）")
@@ -142,6 +194,17 @@ def main():
             mean, worst = _stats(multiplier=mult, size=size)
             print(f"  x{mult:<3} {size}vs{size}: 平均{mean:5.1f}ターン (最大{worst:3d}) "
                   f"約{mean * SECONDS_PER_TURN / 60:4.1f}分")
+        print()
+
+    print("■ タイミング方式（既定）— わざ ふつう110 / つよい190")
+    for label, skill in SKILL.items():
+        for speed in ('fast', 'normal', 'slow'):
+            row = f"  {label} {speed:<7}: "
+            for size in (1, 2, 3):
+                turns = [timing_battle(size, speed, skill) for _ in range(TRIALS)]
+                mean = statistics.mean(turns)
+                row += f"{size}vs{size} {mean:5.1f}ターン(約{mean * SECONDS_PER_TURN / 60:4.1f}分) "
+            print(row)
         print()
 
     print("■ つかれルールの影響（ばいりつ x20）")

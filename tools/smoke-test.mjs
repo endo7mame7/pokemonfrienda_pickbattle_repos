@@ -32,6 +32,13 @@ const tap = async (text) => { await page.getByText(text, { exact: false }).first
 await page.goto('http://localhost:4173/');
 await shot('01-title');
 
+// サイコロ方式を確かめたいときは、せってい から切り替える
+if (process.env.ATTACK_STYLE === 'dice') {
+  await page.locator('.title').click({ delay: 1800 });
+  await page.getByText('🎲 サイコロ').click();
+  await page.getByText('とじる').click();
+}
+
 // はじめて起動したときは ずかんが からっぽなので、みほんを入れておく
 await page.locator('.mode--sub').click();
 await page.getByText('とりあえず ためしたい').click();
@@ -101,6 +108,8 @@ while (turns < 400) {
     continue;
   }
   if (body.includes('サイコロを ふろう')) { await page.locator('.dice-button').click({ force: true }); await page.waitForTimeout(900); continue; }
+  if (body.includes('どの わざに する')) { await page.locator('.move-btn').nth(turns % 2).click(); continue; }
+  if (body.includes('まんなかで とめよう')) { await page.locator('.gauge').click({ force: true }); await page.waitForTimeout(1300); continue; }
   if (body.includes('タップして つぎへ')) { await page.locator('.battle-center').click({ force: true }); continue; }
 
   await page.waitForTimeout(120);

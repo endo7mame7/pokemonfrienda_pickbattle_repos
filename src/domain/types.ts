@@ -86,11 +86,19 @@ export const MEGA_THRESHOLD_RATIO: Record<MegaThreshold, Fraction | null> = {
   off: null,
 };
 
+/** 攻撃のやりかた。タイミングは腕、サイコロは運 */
+export type AttackStyle = 'timing' | 'dice';
+
+/** バトルの ながさ。わざの ちから と サイコロの ばいりつ を同時に決める */
+export type BattleSpeed = 'fast' | 'normal' | 'slow';
+
 export type DamageMultiplier = 10 | 20 | 30;
 export type SuperEffectiveBonus = 0 | 10 | 20 | 40 | 60;
 
 /** 保護者向け設定（docs/SPEC.md §4） */
 export interface Settings {
+  attackStyle: AttackStyle;
+  battleSpeed: BattleSpeed;
   damageMultiplier: DamageMultiplier;
   superEffectiveBonus: SuperEffectiveBonus;
   megaThreshold: MegaThreshold;
@@ -100,6 +108,8 @@ export interface Settings {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
+  attackStyle: 'timing',
+  battleSpeed: 'normal',
   damageMultiplier: 20,
   superEffectiveBonus: 20,
   megaThreshold: 'third',

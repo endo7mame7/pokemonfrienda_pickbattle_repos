@@ -1,3 +1,7 @@
+import { movePower } from './moves';
+import type { MoveKind } from './moves';
+import { TIMING_MULTIPLIER } from './timing';
+import type { TimingResult } from './timing';
 import { isSuperEffective } from './typeChart';
 import type { BattlePokemon, Settings } from './types';
 
@@ -6,6 +10,9 @@ export function ceilTo10(n: number): number {
   return Math.ceil(n / 10) * 10;
 }
 
+/** メガシンカ中はタイミングの威力が上がる（サイコロのときは2個になる） */
+export const MEGA_POWER_MULTIPLIER = 1.5;
+
 export interface DamageResult {
   damage: number;
   isSuperEffective: boolean;
@@ -13,23 +20,33 @@ export interface DamageResult {
   isTired: boolean;
 }
 
+/** サイコロの出目か、わざ＋タイミングか。どちらで攻撃したか */
+export type AttackInput =
+  | { style: 'dice'; rolls: number[] }
+  | { style: 'timing'; move: MoveKind; timing: TimingResult };
+
 /**
- * ダメージ = ( 出目の合計 × ばいりつ + ばつぐんボーナス ) ÷ つかれ
+ * ダメージ = ( もとの ちから + ばつぐんボーナス ) ÷ つかれ
  * docs/SPEC.md §3.4
  */
 export function calcDamage(
   attacker: BattlePokemon,
   target: BattlePokemon,
-  rolls: number[],
+  input: AttackInput,
   settings: Settings,
 ): DamageResult {
-  const diceSum = rolls.reduce((sum, roll) => sum + roll, 0);
   const superEffective = isSuperEffective(attacker.type, target.type);
   const tired = settings.fatigueEnabled && attacker.tired;
 
-  let damage = diceSum * settings.damageMultiplier;
-  if (superEffective) damage += settings.superEffectiveBonus;
-  if (tired) damage = ceilTo10(damage / 2);
+  let damage =
+    input.style === 'dice'
+      ? input.rolls.reduce((sum, roll) => sum + roll, 0) * settings.damageMultiplier
+      : movePower(input.move, settings.battleSpeed) *
+        TIMING_MULTIPLIER[input.timing] *
+        (attacker.megaEvolved ? MEGA_POWER_MULTIPLIER : 1);
 
-  return { damage, isSuperEffective: superEffective, isTired: tired };
+  if (superEffective) damage += settings.superEffectiveBonus;
+  if (tired) damage /= 2;
+
+  return { damage: ceilTo10(damage), isSuperEffective: superEffective, isTired: tired };
 }
