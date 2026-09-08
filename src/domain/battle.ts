@@ -40,6 +40,8 @@ export interface TurnResult {
   targetIndex: number;
   /** わざの名前。演出とよみあげに使う */
   moveName: string;
+  /** どの わざ か。演出の はで さ を決める */
+  moveKind: MoveKind;
   /** サイコロのときだけ */
   rolls?: number[];
   /** タイミングのときだけ */
@@ -166,6 +168,8 @@ function resolveAttack(state: BattleState, input: AttackInput): BattleState {
   if (!attacker || !target) return state;
 
   const { damage, isSuperEffective, isTired } = calcDamage(attacker, target, input, state.settings);
+  const kind: MoveKind =
+    input.style === 'timing' ? input.move : input.style === 'mash' ? 'mega' : 'normal';
 
   return {
     ...state,
@@ -175,10 +179,8 @@ function resolveAttack(state: BattleState, input: AttackInput): BattleState {
       attackerType: attacker.type,
       targetName: target.name,
       targetIndex,
-      moveName: moveName(
-        attacker.type,
-        input.style === 'timing' ? input.move : input.style === 'mash' ? 'mega' : 'normal',
-      ),
+      moveName: moveName(attacker.type, kind),
+      moveKind: kind,
       ...(input.style === 'dice' ? { rolls: input.rolls } : {}),
       ...(input.style === 'timing' ? { timing: input.timing } : {}),
       ...(input.style === 'mash' ? { mashFill: input.fill } : {}),

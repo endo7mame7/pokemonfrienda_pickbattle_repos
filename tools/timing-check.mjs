@@ -52,7 +52,7 @@ let shotMove = false;
 let shotGauge = false;
 let shotResult = false;
 
-for (let i = 0; i < 600; i += 1) {
+for (let i = 0; i < 900; i += 1) {
   const body = await page.locator('body').innerText();
   if (body.includes('の かち！')) { decided = true; break; }
 
@@ -83,7 +83,7 @@ for (let i = 0; i < 600; i += 1) {
   if (body.includes('まんなかで とめよう')) {
     if (!shotGauge) { await shot('31-gauge'); shotGauge = true; }
     await page.locator('.gauge').click({ force: true });
-    await page.waitForTimeout(1400); // 飛んで 当たる まで
+    await page.waitForTimeout(2400); // カットイン + 飛んで 当たる まで
     continue;
   }
   if (body.includes('タップして つぎへ')) {

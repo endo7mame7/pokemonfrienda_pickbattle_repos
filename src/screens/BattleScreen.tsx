@@ -16,7 +16,7 @@ import {
   rollDice,
   OPPONENT_OF,
 } from '../domain';
-import type { BattleState, Pick, PlayerId, Settings, TimingMoveKind } from '../domain';
+import type { BattleState, MoveKind, Pick, PlayerId, Settings, TimingMoveKind } from '../domain';
 import { TYPE_COLORS } from '../ui/typeColors';
 import { HandOffScreen } from './HandOffScreen';
 
@@ -30,8 +30,12 @@ interface Props {
 }
 
 const ROLL_ANIMATION_MS = 700;
-const ATTACK_EFFECT_MS = 780;
 const MEGA_ANIMATION_MS = 2400;
+
+/** カットインの ながさ。つよい わざ ほど ためて 見せる */
+const CUT_IN_MS: Record<MoveKind, number> = { normal: 700, strong: 900, mega: 1300 };
+/** 飛んでいって 当たって、はじけ終わるまで */
+const STRIKE_MS = 1350;
 
 /** 対面で遊ぶので、チームの場所は入れかわらない。あかは上、あおは下で固定 */
 const TOP: PlayerId = 'p1';
@@ -44,6 +48,8 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
     (init) => createBattle(init.p1, init.p2, init.firstPlayer, init.settings),
   );
   const [rolling, setRolling] = useState(false);
+  // 攻撃演出の いまの 段階
+  const [stage, setStage] = useState<'cutIn' | 'strike'>('cutIn');
   const bodyRef = useRef<HTMLDivElement>(null);
   // 攻撃エフェクトを、こうげきする子から ねらわれた子へ飛ばすための位置
   const [path, setPath] = useState<AttackPath | null>(null);
@@ -79,12 +85,20 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
     }
   }, [state.phase, state.lastResult, state.selectedAttackerIndex, state.turnPlayer]);
 
-  // 攻撃エフェクトを見せてから、ダメージを当てる
+  // カットイン → 飛んで当たる → ダメージ、の順に見せてから ダメージを当てる
   useEffect(() => {
-    if (state.phase !== 'attacking') return undefined;
-    const timer = window.setTimeout(() => dispatch({ type: 'next' }), ATTACK_EFFECT_MS);
-    return () => window.clearTimeout(timer);
-  }, [state.phase]);
+    if (state.phase !== 'attacking') {
+      setStage('cutIn');
+      return undefined;
+    }
+    const cutIn = CUT_IN_MS[state.lastResult?.moveKind ?? 'normal'];
+    const toStrike = window.setTimeout(() => setStage('strike'), cutIn);
+    const toDamage = window.setTimeout(() => dispatch({ type: 'next' }), cutIn + STRIKE_MS);
+    return () => {
+      window.clearTimeout(toStrike);
+      window.clearTimeout(toDamage);
+    };
+  }, [state.phase, state.lastResult]);
 
   // メガシンカの演出は、見せてから自動で次に進む
   useEffect(() => {
@@ -143,7 +157,7 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
           ? '💤 つかれてる… もっと れんだ！'
           : 'ボタンを れんだ！';
       case 'attacking':
-        return `${result?.attackerName}の ${result?.moveName}！`;
+        return stage === 'cutIn' ? '' : `${result?.attackerName}の ${result?.moveName}！`;
       case 'resolve':
         return result?.targetFainted ? `${result.targetName}は たおれた！` : '';
       default:
@@ -335,14 +349,21 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
         {renderTeam(BOTTOM)}
         {teamLabel(BOTTOM)}
 
-        {path && result && (state.phase === 'attacking' || state.phase === 'resolve') && (
+        {path && result && attackerPokemon && (state.phase === 'attacking' || state.phase === 'resolve') && (
           <AttackAnimation
-            key={`${state.turnCount}-${state.phase}`}
+            key={`${state.turnCount}-${state.phase}-${stage}`}
             path={path}
-            type={result.attackerType}
+            attacker={{
+              name: attackerPokemon.name,
+              type: attackerPokemon.type,
+              shape: attackerPokemon.silhouette,
+              megaEvolved: attackerPokemon.megaEvolved,
+            }}
+            moveName={result.moveName}
+            moveKind={result.moveKind}
             damage={result.damage}
             isSuperEffective={result.isSuperEffective}
-            phase={state.phase}
+            stage={state.phase === 'resolve' ? 'damage' : stage}
           />
         )}
       </div>

@@ -32,13 +32,15 @@ for (let i = 0; i < 200 && shots < 4; i++) {
   if (body.includes('だれを ねらう')) {
     await page.locator('[data-role=target] .card--selectable').first().click({ force: true }); continue;
   }
-  if (body.includes('サイコロを ふろう')) {
-    await page.locator('.dice-button').click({ force: true });
-    await page.waitForTimeout(1000);           // サイコロ700ms + エフェクトが いちばん大きいころ
+  if (body.includes('どの わざに する')) { await page.locator('.move-btn').nth(shots % 2).click(); continue; }
+  if (body.includes('まんなかで とめよう')) {
+    await page.locator('.gauge').click({ force: true });
     shots += 1;
-    const dmg = await page.locator('.fx').count();
-    await page.screenshot({ path: `${OUT}/fx-${shots}.png` });
-    console.log(`shot ${shots}: エフェクト要素=${dmg}`);
+    await page.waitForTimeout(450);            // カットインの まっさいちゅう
+    await page.screenshot({ path: `${OUT}/cutin-${shots}.png` });
+    await page.waitForTimeout(900);            // 当たって はじけるころ
+    await page.screenshot({ path: `${OUT}/impact-${shots}.png` });
+    await page.waitForTimeout(900);
     continue;
   }
   if (body.includes('タップして つぎへ')) { await page.locator('.battle-center').click({ force: true }); continue; }

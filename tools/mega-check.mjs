@@ -96,7 +96,11 @@ for (let i = 0; i < 400 && mashFill === null; i += 1) {
       if (t === 8) await shot('44-mash');
     }
     await shot('45-mash-max');
-    await page.waitForTimeout(3200);
+    await page.waitForTimeout(3100);           // れんだの じかん が おわる
+    await shot('46-mega-cutin');               // メガわざ の カットイン
+    await page.waitForTimeout(1500);
+    await shot('47-mega-impact');              // メガわざ の 着弾
+    await page.waitForTimeout(1400);
     continue;
   }
   if (body.includes('まんなかで とめよう')) {
@@ -106,7 +110,7 @@ for (let i = 0; i < 400 && mashFill === null; i += 1) {
   }
   if (body.includes('タップして つぎへ')) {
     const m = body.match(/ゲージ (\d+)%|MAX/);
-    if (m) { mashFill = m[0]; await shot('46-mash-result'); }
+    if (m) { mashFill = m[0]; await shot('48-mash-result'); }
     await page.locator('.battle-center').click({ force: true });
     continue;
   }
