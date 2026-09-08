@@ -1,11 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
-import { TIMING_ZONES } from '../domain';
+import { zonesFor } from '../domain';
 import type { MoveKind, PokemonType } from '../domain';
 import { TYPE_COLORS } from '../ui/typeColors';
 
 interface Props {
   move: MoveKind;
   type: PokemonType;
+  /** つかれていると ゾーンが せまくなる */
+  tired: boolean;
+  /** メガシンカ中は ゾーンが ひろくなる */
+  megaEvolved: boolean;
   onStop: (position: number) => void;
 }
 
@@ -17,8 +21,8 @@ const CYCLE_MS = 1400;
  * バーが左右に動くので、まんなかの あかいゾーンで止める。
  * つよい わざ ほど ゾーンが せまい。
  */
-export function TimingGauge({ move, type, onStop }: Props) {
-  const zones = TIMING_ZONES[move];
+export function TimingGauge({ move, type, tired, megaEvolved, onStop }: Props) {
+  const zones = zonesFor(move, { tired, megaEvolved });
   const [position, setPosition] = useState(0.5);
   const stopped = useRef(false);
   const startedAt = useRef(performance.now());
@@ -64,7 +68,11 @@ export function TimingGauge({ move, type, onStop }: Props) {
         />
         <div className="gauge__marker" style={{ left: percent(position) }} />
       </div>
-      <div className="gauge__hint">まんなかで タップ！</div>
+      <div className="gauge__hint">
+        {tired && '💤 つかれてて ねらいにくい… '}
+        {megaEvolved && '🌈 メガシンカで ねらいやすい！ '}
+        まんなかで タップ！
+      </div>
     </button>
   );
 }

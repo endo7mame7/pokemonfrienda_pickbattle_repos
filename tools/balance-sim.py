@@ -134,35 +134,63 @@ MOVE_POWER = {'normal': 110, 'strong': 190}
 SPEED_SCALE = {'fast': 1.4, 'normal': 1.0, 'slow': 0.7}
 TIMING_MULT = {'perfect': 2.0, 'near': 1.0, 'miss': 0.5}
 # 園児の うでまえ の想定（ぴったり / ちかい の確率）
-SKILL = {'園児': (0.15, 0.50), '大人': (0.35, 0.55)}
+# まんなかに どれくらい 寄せられるか（0 = でたらめ、1 = かならず まんなか）
+SKILL = {'園児': 0.0, '大人': 0.45}
+
+
+# ねらう はば の ばいすう（docs/SPEC.md §3.6・§3.7）
+TIRED_ZONE = {'perfect': 0.5, 'near': 0.7}
+MEGA_ZONE = {'perfect': 1.5, 'near': 1.2}
+BASE_ZONE = {'normal': {'perfect': 0.12, 'near': 0.32},
+             'strong': {'perfect': 0.06, 'near': 0.22}}
+
+
+def timing_result(move, tired, mega, skill):
+    """ゲージを止めた結果。うでまえ は「まんなかを どれくらい ねらえるか」で表す。
+
+    園児は ほぼ でたらめ に止めるので、成功率は ゾーンの ひろさ に比例する。
+    うまい人ほど まんなか に寄るので、その ぶん を skill_bias で足す。
+    """
+    zone = BASE_ZONE[move]
+    perfect = zone['perfect'] * (TIRED_ZONE['perfect'] if tired else 1) * (MEGA_ZONE['perfect'] if mega else 1)
+    near = zone['near'] * (TIRED_ZONE['near'] if tired else 1) * (MEGA_ZONE['near'] if mega else 1)
+    bias = skill  # 0 = でたらめ、大きいほど まんなかに寄る
+    # まんなかからの ずれ。bias が大きいほど 0 に近くなる
+    distance = abs(random.random() - 0.5) * (1 - bias)
+    if distance <= perfect:
+        return 'perfect'
+    if distance <= near:
+        return 'near'
+    return 'miss'
 
 
 def timing_battle(size, speed='normal', skill=SKILL['園児'], strong_rate=0.45,
-                  bonus=DEFAULT_BONUS, mega=DEFAULT_MEGA, fatigue=DEFAULT_FATIGUE):
+                  bonus=DEFAULT_BONUS, mega=DEFAULT_MEGA, fatigue=DEFAULT_FATIGUE,
+                  strategy='rotate'):
     """タイミング方式で1バトルを進めて、かかったターン数を返す。"""
     teams = [_make_team(size), _make_team(size)]
     turns = 0
     side = 0
-    perfect, near = skill
     while all(any(p['hp'] > 0 for p in t) for t in teams):
         turns += 1
         alive = [p for p in teams[side] if p['hp'] > 0]
-        fresh = [p for p in alive if not p['tired']]
-        attacker = fresh[0] if fresh else alive[0]
+        if strategy == 'rotate':
+            fresh = [p for p in alive if not p['tired']]
+            attacker = fresh[0] if fresh else alive[0]
+        else:
+            attacker = alive[0]
         target = next(p for p in teams[1 - side] if p['hp'] > 0)
 
         move = 'strong' if random.random() < strong_rate else 'normal'
-        r = random.random()
-        result = 'perfect' if r < perfect else ('near' if r < perfect + near else 'miss')
+        was_tired = fatigue and attacker['tired']
+        result = timing_result(move, was_tired, attacker['mega'], skill)
 
         damage = MOVE_POWER[move] * SPEED_SCALE[speed] * TIMING_MULT[result]
         if attacker['mega']:
             damage *= 1.5
         if target['type'] in CHART[attacker['type']]:
             damage += bonus
-        was_tired = fatigue and attacker['tired']
-        if was_tired:
-            damage /= 2
+        # つかれても ダメージは減らさない。ねらう はば が せまくなる ぶん で効く
         damage = ceil_to_10(int(damage))
 
         if fatigue:
@@ -206,6 +234,14 @@ def main():
                 row += f"{size}vs{size} {mean:5.1f}ターン(約{mean * SECONDS_PER_TURN / 60:4.1f}分) "
             print(row)
         print()
+
+    print("■ タイミング方式で、交代して戦うと どれだけ得か（園児・ふつう）")
+    print(f"  {'':6}{'交代する':>12}{'同じ子を連打':>14}")
+    for size in (1, 2, 3):
+        rot = statistics.mean([timing_battle(size, strategy='rotate') for _ in range(TRIALS)])
+        same = statistics.mean([timing_battle(size, strategy='same') for _ in range(TRIALS)])
+        print(f"  {size}vs{size}{'':2}{rot:9.1f}ターン{same:11.1f}ターン")
+    print()
 
     print("■ つかれルールの影響（ばいりつ x20）")
     print(f"  {'':6}{'つかれなし':>12}{'あり・交代':>12}{'あり・連打':>12}")

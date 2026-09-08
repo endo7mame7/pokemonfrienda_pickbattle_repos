@@ -37,6 +37,9 @@ export function calcDamage(
 ): DamageResult {
   const superEffective = isSuperEffective(attacker.type, target.type);
   const tired = settings.fatigueEnabled && attacker.tired;
+  // タイミング方式では、つかれは「ねらう ところが せまくなる」で表す（§3.7）。
+  // ダメージを半分にするのは サイコロ方式のときだけ。
+  const halvesDamage = tired && input.style === 'dice';
 
   let damage =
     input.style === 'dice'
@@ -46,7 +49,7 @@ export function calcDamage(
         (attacker.megaEvolved ? MEGA_POWER_MULTIPLIER : 1);
 
   if (superEffective) damage += settings.superEffectiveBonus;
-  if (tired) damage /= 2;
+  if (halvesDamage) damage /= 2;
 
   return { damage: ceilTo10(damage), isSuperEffective: superEffective, isTired: tired };
 }

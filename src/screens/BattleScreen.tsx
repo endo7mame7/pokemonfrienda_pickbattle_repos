@@ -235,6 +235,8 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
             <TimingGauge
               move={state.selectedMove}
               type={attackerPokemon.type}
+              tired={settings.fatigueEnabled && attackerPokemon.tired}
+              megaEvolved={attackerPokemon.megaEvolved}
               onStop={(position) => dispatch({ type: 'stopTiming', position })}
             />
           )}
@@ -267,7 +269,11 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
                     ⚡ ばつぐん！ +{settings.superEffectiveBonus}
                   </span>
                 )}
-                {result.isTired && <span className="badge badge--tired">💤 つかれて はんぶん</span>}
+                {result.isTired && (
+                  <span className="badge badge--tired">
+                    {settings.attackStyle === 'timing' ? '💤 つかれて ねらいにくい' : '💤 つかれて はんぶん'}
+                  </span>
+                )}
               </div>
               {/* ダメージの数は、当たった場所に大きく出す（下の演出レイヤー） */}
               {state.phase === 'resolve' && <div className="tap-hint">タップして つぎへ 👆</div>}
@@ -311,7 +317,11 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
             <div className="overlay__title" style={{ fontSize: 22 }}>
               {state.teams[attackerSide][tiredConfirmIndex]?.name}は つかれてるよ
             </div>
-            <p style={{ margin: 0 }}>ダメージが はんぶんに なるけど、それでも いい？</p>
+            <p style={{ margin: 0 }}>
+              {settings.attackStyle === 'timing'
+                ? 'ねらう ところが せまく なるけど、それでも いい？'
+                : 'ダメージが はんぶんに なるけど、それでも いい？'}
+            </p>
             <button
               type="button"
               className="btn"

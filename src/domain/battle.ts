@@ -259,10 +259,18 @@ export function battleReducer(state: BattleState, action: BattleAction): BattleS
 
     case 'stopTiming': {
       if (state.phase !== 'timing' || state.selectedMove === null) return state;
+      const attacker =
+        state.selectedAttackerIndex === null
+          ? undefined
+          : state.teams[state.turnPlayer][state.selectedAttackerIndex];
+      if (!attacker) return state;
       return resolveAttack(state, {
         style: 'timing',
         move: state.selectedMove,
-        timing: judgeTiming(action.position, state.selectedMove),
+        timing: judgeTiming(action.position, state.selectedMove, {
+          tired: state.settings.fatigueEnabled && attacker.tired,
+          megaEvolved: attacker.megaEvolved,
+        }),
       });
     }
 

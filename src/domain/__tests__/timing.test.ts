@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { calcDamage, ceilTo10 } from '../damage';
 import { MOVE_POWER, moveName } from '../moves';
 import { POKEMON_TYPES } from '../types';
-import { TIMING_ZONES, judgeTiming } from '../timing';
+import { MEGA_ZONE_SCALE, TIMING_ZONES, TIRED_ZONE_SCALE, judgeTiming, zonesFor } from '../timing';
 import { makePokemon, makeSettings } from './testHelpers';
 
 describe('judgeTiming（ゲージを止めた判定）', () => {
@@ -32,6 +32,41 @@ describe('judgeTiming（ゲージを止めた判定）', () => {
     for (const distance of [0.05, 0.15, 0.4]) {
       expect(judgeTiming(0.5 - distance, 'normal')).toBe(judgeTiming(0.5 + distance, 'normal'));
     }
+  });
+});
+
+describe('つかれ と メガシンカ で ねらう はば が変わる（docs/SPEC.md §3.6・§3.7）', () => {
+  it('つかれていると せまくなる', () => {
+    const base = zonesFor('normal');
+    const tired = zonesFor('normal', { tired: true });
+    expect(tired.perfect).toBeLessThan(base.perfect);
+    expect(tired.near).toBeLessThan(base.near);
+    expect(tired.perfect).toBeCloseTo(base.perfect * TIRED_ZONE_SCALE.perfect);
+  });
+
+  it('メガシンカ中は ひろくなる', () => {
+    const base = zonesFor('strong');
+    const mega = zonesFor('strong', { megaEvolved: true });
+    expect(mega.perfect).toBeGreaterThan(base.perfect);
+    expect(mega.perfect).toBeCloseTo(base.perfect * MEGA_ZONE_SCALE.perfect);
+  });
+
+  it('つかれた状態でも メガシンカ中なら 少し取り返せる', () => {
+    const tired = zonesFor('normal', { tired: true });
+    const both = zonesFor('normal', { tired: true, megaEvolved: true });
+    expect(both.perfect).toBeGreaterThan(tired.perfect);
+  });
+
+  it('おなじ位置でも、つかれていると ぴったり が とれなくなる', () => {
+    const position = 0.5 + TIMING_ZONES.normal.perfect - 0.01; // ふつうなら ぴったり
+    expect(judgeTiming(position, 'normal')).toBe('perfect');
+    expect(judgeTiming(position, 'normal', { tired: true })).not.toBe('perfect');
+  });
+
+  it('おなじ位置でも、メガシンカ中なら ぴったり になる', () => {
+    const position = 0.5 + TIMING_ZONES.strong.perfect + 0.01; // ふつうなら ちかい
+    expect(judgeTiming(position, 'strong')).toBe('near');
+    expect(judgeTiming(position, 'strong', { megaEvolved: true })).toBe('perfect');
   });
 });
 
@@ -77,10 +112,10 @@ describe('タイミングのダメージ', () => {
     expect(hit('normal', 'near', mega)).toBeGreaterThan(hit('normal', 'near'));
   });
 
-  it('つかれていると 半分になる', () => {
+  it('つかれていても ダメージは減らない（かわりに ねらいにくくなる）', () => {
     const tired = makePokemon({ type: 'ほのお', tired: true });
-    expect(hit('normal', 'near', tired)).toBe(ceilTo10(MOVE_POWER.normal / 2));
-    expect(hit('strong', 'perfect', tired)).toBe(hit('strong', 'perfect') / 2);
+    expect(hit('normal', 'near', tired)).toBe(hit('normal', 'near'));
+    expect(hit('strong', 'perfect', tired)).toBe(hit('strong', 'perfect'));
   });
 
   it('バトルの ながさ の設定で ちから が変わる', () => {
