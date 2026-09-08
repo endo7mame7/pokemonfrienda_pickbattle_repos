@@ -76,7 +76,7 @@ await shot('07-battle-start');
 let turns = 0;
 let sawSuperEffective = false, sawTired = false, sawMega = false, shotBattle = false;
 let shotMegaPrompt = false, shotMegaAnim = false;
-while (turns < 400) {
+while (turns < 900) {
   turns += 1;
   const body = await page.locator('body').innerText();
 
@@ -107,9 +107,9 @@ while (turns < 400) {
     await page.locator('[data-role=target] .card--selectable').first().click({ force: true });
     continue;
   }
-  if (body.includes('サイコロを ふろう')) { await page.locator('.dice-button').click({ force: true }); await page.waitForTimeout(900); continue; }
+  if (body.includes('サイコロを ふろう')) { await page.locator('.dice-button').click({ force: true }); await page.waitForTimeout(900 + 2300); continue; }
   if (body.includes('どの わざに する')) { await page.locator('.move-btn').nth(turns % 2).click(); continue; }
-  if (body.includes('まんなかで とめよう')) { await page.locator('.gauge').click({ force: true }); await page.waitForTimeout(1300); continue; }
+  if (body.includes('まんなかで とめよう')) { await page.locator('.gauge').click({ force: true }); await page.waitForTimeout(2400); continue; }
   if (body.includes('れんだ！')) {
     for (let t = 0; t < 22; t += 1) await page.locator('.mash__button').click({ force: true });
     await page.waitForTimeout(3300);
