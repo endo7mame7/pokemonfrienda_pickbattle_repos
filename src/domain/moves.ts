@@ -1,7 +1,14 @@
 import type { BattleSpeed, DamageMultiplier, PokemonType } from './types';
 
-/** わざの種類。つよい ほど ねらう場所が せまい */
-export type MoveKind = 'normal' | 'strong';
+/**
+ * わざの種類。
+ * normal / strong は ゲージを まんなかで とめる。
+ * mega は メガシンカ中だけ つかえて、ボタン連打で ゲージを ためる。
+ */
+export type MoveKind = 'normal' | 'strong' | 'mega';
+
+/** ゲージを とめて ねらう わざ（メガわざ は連打なので ふくまない） */
+export type TimingMoveKind = Exclude<MoveKind, 'mega'>;
 
 /**
  * わざの ちから（docs/SPEC.md §3.4）。
@@ -10,6 +17,8 @@ export type MoveKind = 'normal' | 'strong';
 export const MOVE_POWER: Record<MoveKind, number> = {
   normal: 110,
   strong: 190,
+  /** メガわざ。ねらう必要がないぶん、最大は つよいわざ の ぴったり より ひかえめ */
+  mega: 150,
 };
 
 /**
@@ -17,24 +26,24 @@ export const MOVE_POWER: Record<MoveKind, number> = {
  * 実在のわざ名は使わず、タイプが分かる やさしい ことばにしている。
  */
 export const MOVE_NAMES: Record<PokemonType, Record<MoveKind, string>> = {
-  ノーマル: { normal: 'からだアタック', strong: 'ぜんりょくアタック' },
-  ほのお: { normal: 'ひのたま', strong: 'だいばくえん' },
-  みず: { normal: 'みずしぶき', strong: 'だいうずしお' },
-  でんき: { normal: 'ビリビリ', strong: 'いなずまショック' },
-  くさ: { normal: 'つるアタック', strong: 'はっぱあらし' },
-  こおり: { normal: 'つめたいかぜ', strong: 'こおりのあらし' },
-  かくとう: { normal: 'れんぞくパンチ', strong: 'ひっさつキック' },
-  どく: { normal: 'どくのきり', strong: 'どくどくあらし' },
-  じめん: { normal: 'すなけむり', strong: 'だいちゆれ' },
-  ひこう: { normal: 'かぜおこし', strong: 'たつまきアタック' },
-  エスパー: { normal: 'ふしぎなちから', strong: 'ひかりのビーム' },
-  むし: { normal: 'むしのはね', strong: 'むれアタック' },
-  いわ: { normal: 'いわなげ', strong: 'だいいわおとし' },
-  ゴースト: { normal: 'おどかす', strong: 'やみのたま' },
-  ドラゴン: { normal: 'りゅうのかぜ', strong: 'ドラゴンほうこう' },
-  あく: { normal: 'いじわるアタック', strong: 'やみのいちげき' },
-  はがね: { normal: 'てつのツメ', strong: 'てつのたいほう' },
-  フェアリー: { normal: 'きらきらこな', strong: 'ゆめのひかり' },
+  ノーマル: { normal: 'からだアタック', strong: 'ぜんりょくアタック', mega: 'メガインパクト' },
+  ほのお: { normal: 'ひのたま', strong: 'だいばくえん', mega: 'メガフレア' },
+  みず: { normal: 'みずしぶき', strong: 'だいうずしお', mega: 'メガウェーブ' },
+  でんき: { normal: 'ビリビリ', strong: 'いなずまショック', mega: 'メガサンダー' },
+  くさ: { normal: 'つるアタック', strong: 'はっぱあらし', mega: 'メガリーフ' },
+  こおり: { normal: 'つめたいかぜ', strong: 'こおりのあらし', mega: 'メガブリザード' },
+  かくとう: { normal: 'れんぞくパンチ', strong: 'ひっさつキック', mega: 'メガナックル' },
+  どく: { normal: 'どくのきり', strong: 'どくどくあらし', mega: 'メガポイズン' },
+  じめん: { normal: 'すなけむり', strong: 'だいちゆれ', mega: 'メガクエイク' },
+  ひこう: { normal: 'かぜおこし', strong: 'たつまきアタック', mega: 'メガストーム' },
+  エスパー: { normal: 'ふしぎなちから', strong: 'ひかりのビーム', mega: 'メガサイキック' },
+  むし: { normal: 'むしのはね', strong: 'むれアタック', mega: 'メガスウォーム' },
+  いわ: { normal: 'いわなげ', strong: 'だいいわおとし', mega: 'メガロック' },
+  ゴースト: { normal: 'おどかす', strong: 'やみのたま', mega: 'メガシャドー' },
+  ドラゴン: { normal: 'りゅうのかぜ', strong: 'ドラゴンほうこう', mega: 'メガドラゴン' },
+  あく: { normal: 'いじわるアタック', strong: 'やみのいちげき', mega: 'メガダーク' },
+  はがね: { normal: 'てつのツメ', strong: 'てつのたいほう', mega: 'メガメタル' },
+  フェアリー: { normal: 'きらきらこな', strong: 'ゆめのひかり', mega: 'メガシャイン' },
 };
 
 /** バトルの ながさ で わざの ちから を上げ下げする */

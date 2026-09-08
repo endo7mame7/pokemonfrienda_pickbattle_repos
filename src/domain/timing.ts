@@ -1,4 +1,4 @@
-import type { MoveKind } from './moves';
+import type { TimingMoveKind } from './moves';
 
 /** ゲージを止めた結果 */
 export type TimingResult = 'perfect' | 'near' | 'miss';
@@ -7,7 +7,7 @@ export type TimingResult = 'perfect' | 'near' | 'miss';
  * ゲージの まんなか からの ずれ が、この はば の中なら成功。
  * つよい わざ ほど せまい（0〜0.5 で、ゲージの半分ぶんが 0.5）。
  */
-export const TIMING_ZONES: Record<MoveKind, { perfect: number; near: number }> = {
+export const TIMING_ZONES: Record<TimingMoveKind, { perfect: number; near: number }> = {
   normal: { perfect: 0.12, near: 0.32 },
   strong: { perfect: 0.06, near: 0.22 },
 };
@@ -29,7 +29,7 @@ export interface TimingModifiers {
 
 /** そのポケモンの いまの ねらう はば */
 export function zonesFor(
-  kind: MoveKind,
+  kind: TimingMoveKind,
   { tired = false, megaEvolved = false }: TimingModifiers = {},
 ): { perfect: number; near: number } {
   const base = TIMING_ZONES[kind];
@@ -53,7 +53,7 @@ export const TIMING_MULTIPLIER: Record<TimingResult, number> = {
  */
 export function judgeTiming(
   position: number,
-  kind: MoveKind,
+  kind: TimingMoveKind,
   modifiers: TimingModifiers = {},
 ): TimingResult {
   const zones = zonesFor(kind, modifiers);

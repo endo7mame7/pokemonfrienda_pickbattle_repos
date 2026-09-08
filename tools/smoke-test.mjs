@@ -110,6 +110,11 @@ while (turns < 400) {
   if (body.includes('サイコロを ふろう')) { await page.locator('.dice-button').click({ force: true }); await page.waitForTimeout(900); continue; }
   if (body.includes('どの わざに する')) { await page.locator('.move-btn').nth(turns % 2).click(); continue; }
   if (body.includes('まんなかで とめよう')) { await page.locator('.gauge').click({ force: true }); await page.waitForTimeout(1300); continue; }
+  if (body.includes('れんだ！')) {
+    for (let t = 0; t < 22; t += 1) await page.locator('.mash__button').click({ force: true });
+    await page.waitForTimeout(3300);
+    continue;
+  }
   if (body.includes('タップして つぎへ')) { await page.locator('.battle-center').click({ force: true }); continue; }
 
   await page.waitForTimeout(120);

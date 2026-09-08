@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { zonesFor } from '../domain';
-import type { MoveKind, PokemonType } from '../domain';
+import type { PokemonType, TimingMoveKind } from '../domain';
 import { TYPE_COLORS } from '../ui/typeColors';
 
 interface Props {
-  move: MoveKind;
+  move: TimingMoveKind;
   type: PokemonType;
   /** つかれていると ゾーンが せまくなる */
   tired: boolean;

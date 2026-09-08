@@ -21,6 +21,8 @@ export type BattlePhase =
   | 'chooseMove'
   /** ゲージを止める（タイミングのとき） */
   | 'timing'
+  /** ボタンを連打してゲージをためる（メガわざのとき） */
+  | 'mashing'
   | 'rollDice'
   /** サイコロは出たが、まだ当たっていない。攻撃エフェクトを見せる */
   | 'attacking'
@@ -42,6 +44,8 @@ export interface TurnResult {
   rolls?: number[];
   /** タイミングのときだけ */
   timing?: TimingResult;
+  /** メガわざのときだけ。ゲージの たまりぐあい（0〜1） */
+  mashFill?: number;
   damage: number;
   isSuperEffective: boolean;
   isTired: boolean;
@@ -77,6 +81,8 @@ export type BattleAction =
   | { type: 'chooseMove'; move: MoveKind }
   /** ゲージを止める。position は 0〜1 で 0.5 がまんなか */
   | { type: 'stopTiming'; position: number }
+  /** メガわざの連打がおわった。fill は 0〜1 */
+  | { type: 'finishMash'; fill: number }
   | { type: 'rollDice'; rolls: number[] }
   /** 結果の演出が終わった／受け渡し画面を閉じた */
   | { type: 'next' };
@@ -169,11 +175,13 @@ function resolveAttack(state: BattleState, input: AttackInput): BattleState {
       attackerType: attacker.type,
       targetName: target.name,
       targetIndex,
-      moveName:
-        input.style === 'timing'
-          ? moveName(attacker.type, input.move)
-          : moveName(attacker.type, 'normal'),
-      ...(input.style === 'dice' ? { rolls: input.rolls } : { timing: input.timing }),
+      moveName: moveName(
+        attacker.type,
+        input.style === 'timing' ? input.move : input.style === 'mash' ? 'mega' : 'normal',
+      ),
+      ...(input.style === 'dice' ? { rolls: input.rolls } : {}),
+      ...(input.style === 'timing' ? { timing: input.timing } : {}),
+      ...(input.style === 'mash' ? { mashFill: input.fill } : {}),
       damage,
       isSuperEffective,
       isTired,
@@ -254,11 +262,28 @@ export function battleReducer(state: BattleState, action: BattleAction): BattleS
 
     case 'chooseMove': {
       if (state.phase !== 'chooseMove') return state;
-      return { ...state, phase: 'timing', selectedMove: action.move };
+      const attacker =
+        state.selectedAttackerIndex === null
+          ? undefined
+          : state.teams[state.turnPlayer][state.selectedAttackerIndex];
+      // メガわざは メガシンカ中の子だけ
+      if (action.move === 'mega' && !attacker?.megaEvolved) return state;
+      return {
+        ...state,
+        phase: action.move === 'mega' ? 'mashing' : 'timing',
+        selectedMove: action.move,
+      };
+    }
+
+    case 'finishMash': {
+      if (state.phase !== 'mashing') return state;
+      return resolveAttack(state, { style: 'mash', fill: action.fill });
     }
 
     case 'stopTiming': {
-      if (state.phase !== 'timing' || state.selectedMove === null) return state;
+      if (state.phase !== 'timing' || state.selectedMove === null || state.selectedMove === 'mega') {
+        return state;
+      }
       const attacker =
         state.selectedAttackerIndex === null
           ? undefined

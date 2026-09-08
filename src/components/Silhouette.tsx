@@ -6,6 +6,8 @@ interface Props {
   type: PokemonType;
   size: number;
   shape?: SilhouetteShape | undefined;
+  /** メガシンカ中は とがった オーラ と つの が付いて、つよそうに見える */
+  mega?: boolean;
 }
 
 /**
@@ -13,7 +15,7 @@ interface Props {
  * 「なんとなくそれっぽい かげ」だけを出す。
  * 形は名前から決まるので、同じポケモンなら いつも同じ かげ になる。
  */
-export function Silhouette({ name, type, size, shape }: Props) {
+export function Silhouette({ name, type, size, shape, mega = false }: Props) {
   const color = silhouetteColor(type);
   return (
     <svg
@@ -21,12 +23,45 @@ export function Silhouette({ name, type, size, shape }: Props) {
       width={size}
       height={size}
       role="img"
-      aria-label={`${name}の かげ`}
+      aria-label={mega ? `メガシンカした ${name}の かげ` : `${name}の かげ`}
       style={{ display: 'block', color }}
     >
       <ellipse cx="50" cy="92" rx="30" ry="5" fill="currentColor" opacity="0.18" />
-      <g fill="currentColor">{renderShape(shape ?? shapeForName(name))}</g>
+      {mega && <g fill="currentColor">{renderMegaAura()}</g>}
+      <g fill="currentColor" transform={mega ? 'translate(50 54) scale(0.88) translate(-50 -54)' : undefined}>
+        {renderShape(shape ?? shapeForName(name))}
+      </g>
+      {mega && <g fill="currentColor">{renderMegaCrest()}</g>}
     </svg>
+  );
+}
+
+/** どの かたち にも つけられる とがった オーラ */
+function renderMegaAura() {
+  return Array.from({ length: 14 }, (_, index) => {
+    const angle = (Math.PI * 2 * index) / 14 - Math.PI / 2;
+    const inner = 30;
+    const outer = index % 2 === 0 ? 49 : 41;
+    const spread = 0.1;
+    const point = (a: number, radius: number) =>
+      `${(50 + Math.cos(a) * radius).toFixed(1)},${(54 + Math.sin(a) * radius).toFixed(1)}`;
+    const points = [
+      point(angle - spread, inner),
+      point(angle, outer),
+      point(angle + spread, inner),
+    ].join(' ');
+    return <polygon key={index} points={points} opacity="0.5" />;
+  });
+}
+
+/** あたまの うえ の とがった かんむり */
+function renderMegaCrest() {
+  return (
+    <>
+      <polygon points="34,20 40,2 46,18" />
+      <polygon points="50,16 50,-2 56,14" />
+      <polygon points="62,20 68,4 66,20" />
+    </>
   );
 }
 

@@ -1,5 +1,6 @@
 import { movePower } from './moves';
-import type { MoveKind } from './moves';
+import type { TimingMoveKind } from './moves';
+import { mashMultiplier } from './mash';
 import { TIMING_MULTIPLIER } from './timing';
 import type { TimingResult } from './timing';
 import { isSuperEffective } from './typeChart';
@@ -23,7 +24,9 @@ export interface DamageResult {
 /** サイコロの出目か、わざ＋タイミングか。どちらで攻撃したか */
 export type AttackInput =
   | { style: 'dice'; rolls: number[] }
-  | { style: 'timing'; move: MoveKind; timing: TimingResult };
+  | { style: 'timing'; move: TimingMoveKind; timing: TimingResult }
+  /** メガわざ。fill は ゲージの たまりぐあい（0〜1） */
+  | { style: 'mash'; fill: number };
 
 /**
  * ダメージ = ( もとの ちから + ばつぐんボーナス ) ÷ つかれ
@@ -41,12 +44,16 @@ export function calcDamage(
   // ダメージを半分にするのは サイコロ方式のときだけ。
   const halvesDamage = tired && input.style === 'dice';
 
-  let damage =
-    input.style === 'dice'
-      ? input.rolls.reduce((sum, roll) => sum + roll, 0) * settings.damageMultiplier
-      : movePower(input.move, settings.battleSpeed) *
-        TIMING_MULTIPLIER[input.timing] *
-        (attacker.megaEvolved ? MEGA_POWER_MULTIPLIER : 1);
+  const megaBoost = attacker.megaEvolved ? MEGA_POWER_MULTIPLIER : 1;
+  let damage: number;
+  if (input.style === 'dice') {
+    damage = input.rolls.reduce((sum, roll) => sum + roll, 0) * settings.damageMultiplier;
+  } else if (input.style === 'timing') {
+    damage =
+      movePower(input.move, settings.battleSpeed) * TIMING_MULTIPLIER[input.timing] * megaBoost;
+  } else {
+    damage = movePower('mega', settings.battleSpeed) * mashMultiplier(input.fill) * megaBoost;
+  }
 
   if (superEffective) damage += settings.superEffectiveBonus;
   if (halvesDamage) damage /= 2;

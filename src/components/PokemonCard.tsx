@@ -70,6 +70,7 @@ export function PokemonCard({
           name={pokemon.name}
           type={pokemon.type}
           shape={pokemon.silhouette}
+          mega={pokemon.megaEvolved}
           size={40}
         />
         <div className="card__name">{pokemon.name}</div>

@@ -21,7 +21,7 @@ Safari の「ホーム画面に追加」で全画面アプリとして動く Web
 
 | ファイル | 内容 |
 | --- | --- |
-| [docs/SPEC.md](docs/SPEC.md) | 仕様書 v1.0（ゲームルール・設定・バランス検証・UX要件・画面・データモデル・iPhone/PWA対応・データベース・開発フェーズ） |
+| [docs/SPEC.md](docs/SPEC.md) | 仕様書 v1.1（ゲームルール・設定・バランス検証・UX要件・画面・データモデル・iPhone/PWA対応・データベース・開発フェーズ） |
 | [tools/balance-sim.py](tools/balance-sim.py) | バトル時間のバランス検証シミュレーター |
 
 ルールや設定の既定値を変えたら、シミュレーターでプレイ時間を再確認する。
@@ -58,7 +58,7 @@ PC を起動している間だけ遊べる。
 ```
 npm install
 npm run dev       # 開発サーバー
-npm test          # ユニットテスト（98件）
+npm test          # ユニットテスト（108件）
 npm run typecheck
 npm run build
 ```
@@ -73,6 +73,7 @@ npm run preview &               # http://localhost:4173
 TEAM_SIZE=3 npm run smoke       # バトルを最後まで自動プレイ
 npm run check:pickbook          # ピックの登録と、開き直しても残ること
 npm run check:timing            # タイミング方式のバトルを通しで確認
+npm run check:mega              # メガシンカの見た目と メガわざ(れんだ)
 npm run preview:effects <出力先> # 攻撃エフェクトの見た目を撮る
 ```
 
@@ -80,7 +81,7 @@ npm run preview:effects <出力先> # 攻撃エフェクトの見た目を撮る
 
 ## 開発状況
 
-- 仕様策定（v1.0）… 完了
+- 仕様策定（v1.1）… 完了
 - **P0: ルールの土台**（タイプ相性・ダメージ計算・つかれ・メガシンカ・バトル進行 + テスト49件）… 完了
 - **P1: 遊べる最小版**（タイトル → 人数 → チーム → コイントス → バトル → けっか。ずかんは仮データ）… 完了
 - **P2: ずかんデータベース**（IndexedDB・写真登録・モードえらび・まえとおなじ）… 完了
