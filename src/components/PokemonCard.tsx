@@ -1,7 +1,7 @@
 import { effectIntensity } from '../ui/attackEffects';
 import type { BattlePokemon } from '../domain';
 import { TYPE_COLORS } from '../ui/typeColors';
-import { PokemonFace } from './PokemonFace';
+import { Silhouette } from './Silhouette';
 
 /** 攻撃を受けている最中だけ渡される。カードは ゆれる だけ */
 export interface HitEffect {
@@ -66,11 +66,11 @@ export function PokemonCard({
           {!fainted && pokemon.megaEvolved && '🌈'}
           {!fainted && pokemon.tired && '💤'}
         </div>
-        <PokemonFace
+        <Silhouette
           name={pokemon.name}
           type={pokemon.type}
-          photo={pokemon.photo}
           shape={pokemon.silhouette}
+          mega={pokemon.megaEvolved}
           size={40}
         />
         <div className="card__name">{pokemon.name}</div>

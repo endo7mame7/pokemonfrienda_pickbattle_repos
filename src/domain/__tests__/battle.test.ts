@@ -10,12 +10,22 @@ import {
   type BattleAction,
   type BattleState,
 } from '../battle';
+import { MOVE_NAMES } from '../moves';
 import { OPPONENT_OF } from '../types';
 import { makePick, makeSettings } from './testHelpers';
 
-const settings = makeSettings({ damageMultiplier: 20, superEffectiveBonus: 20 });
+// ここまでのテストは サイコロ方式 の検証。タイミング方式は下の describe で
+const settings = makeSettings({
+  attackStyle: 'dice',
+  damageMultiplier: 20,
+  superEffectiveBonus: 20,
+});
 // メガシンカの検証では、つかれによる半減で発動ラインがぼやけないよう切っておく
-const megaSettings = makeSettings({ damageMultiplier: 20, fatigueEnabled: false });
+const megaSettings = makeSettings({
+  attackStyle: 'dice',
+  damageMultiplier: 20,
+  fatigueEnabled: false,
+});
 
 function apply(state: BattleState, ...actions: BattleAction[]): BattleState {
   return actions.reduce(battleReducer, state);
@@ -334,6 +344,66 @@ describe('バトルの進行', () => {
     state = opponentTurn(attack(state, 0, 0, [2])); // A: 40
     state = attack(state, 1, 0, [5]); // B: 100
     expect(mvpOf(state.teams.p1)?.name).toBe('B');
+  });
+});
+
+describe('タイミング方式の進行', () => {
+  const timingSettings = makeSettings({ attackStyle: 'timing', superEffectiveBonus: 20 });
+
+  const start = () =>
+    apply(
+      createBattle([makePick()], [makePick({ energy: 350 })], 'p1', timingSettings),
+      { type: 'selectAttacker', index: 0 },
+      { type: 'selectTarget', index: 0 },
+    );
+
+  it('ねらう子をえらぶと、つぎは わざ えらび（サイコロではない）', () => {
+    expect(start().phase).toBe('chooseMove');
+  });
+
+  it('わざをえらぶと ゲージ、止めると こうげき', () => {
+    let state = battleReducer(start(), { type: 'chooseMove', move: 'strong' });
+    expect(state.phase).toBe('timing');
+    expect(state.selectedMove).toBe('strong');
+
+    state = battleReducer(state, { type: 'stopTiming', position: 0.5 });
+    expect(state.phase).toBe('attacking');
+    expect(state.lastResult?.timing).toBe('perfect');
+    expect(state.lastResult?.moveName).toBeTruthy();
+  });
+
+  it('まんなかで止めるほど ダメージが大きい', () => {
+    const damageAt = (position: number) => {
+      const state = apply(
+        battleReducer(start(), { type: 'chooseMove', move: 'normal' }),
+        { type: 'stopTiming', position },
+      );
+      return state.lastResult!.damage;
+    };
+    expect(damageAt(0.5)).toBeGreaterThan(damageAt(0.7));
+    expect(damageAt(0.7)).toBeGreaterThan(damageAt(0.05));
+  });
+
+  it('わざの名前は タイプと わざの種類で決まる', () => {
+    const fire = apply(
+      createBattle([makePick({ type: 'ほのお' })], [makePick()], 'p1', timingSettings),
+      { type: 'selectAttacker', index: 0 },
+      { type: 'selectTarget', index: 0 },
+      { type: 'chooseMove', move: 'strong' },
+      { type: 'stopTiming', position: 0.5 },
+    );
+    expect(fire.lastResult?.moveName).toBe(MOVE_NAMES.ほのお.strong);
+  });
+
+  it('ゲージを止めるまでは えらびなおせる', () => {
+    const state = battleReducer(start(), { type: 'clearSelection' });
+    expect(state.phase).toBe('selectAttacker');
+    expect(state.selectedMove).toBeNull();
+  });
+
+  it('タイミング方式では サイコロを振っても なにも起きない', () => {
+    const state = battleReducer(start(), { type: 'rollDice', rolls: [6] });
+    expect(state.phase).toBe('chooseMove');
   });
 });
 

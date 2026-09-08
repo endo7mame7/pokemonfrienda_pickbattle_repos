@@ -32,6 +32,13 @@ const tap = async (text) => { await page.getByText(text, { exact: false }).first
 await page.goto('http://localhost:4173/');
 await shot('01-title');
 
+// サイコロ方式を確かめたいときは、せってい から切り替える
+if (process.env.ATTACK_STYLE === 'dice') {
+  await page.locator('.title').click({ delay: 1800 });
+  await page.getByText('🎲 サイコロ').click();
+  await page.getByText('とじる').click();
+}
+
 // はじめて起動したときは ずかんが からっぽなので、みほんを入れておく
 await page.locator('.mode--sub').click();
 await page.getByText('とりあえず ためしたい').click();
@@ -88,7 +95,7 @@ while (turns < 400) {
   if (body.includes('スマホを わたしてね')) { await page.getByText('じゅんび できた').click(); continue; }
   if (body.includes('こうげき する！')) { await page.getByText('こうげき する！').click(); continue; }
   if (body.includes('ばつぐん！')) sawSuperEffective = true;
-  if (body.includes('つかれて はんぶん')) sawTired = true;
+  if (body.includes('つかれて')) sawTired = true;
 
   if (body.includes('だれで こうげきする')) {
     // こうげきする側・ねらう側を data-role で選び分ける
@@ -101,6 +108,13 @@ while (turns < 400) {
     continue;
   }
   if (body.includes('サイコロを ふろう')) { await page.locator('.dice-button').click({ force: true }); await page.waitForTimeout(900); continue; }
+  if (body.includes('どの わざに する')) { await page.locator('.move-btn').nth(turns % 2).click(); continue; }
+  if (body.includes('まんなかで とめよう')) { await page.locator('.gauge').click({ force: true }); await page.waitForTimeout(1300); continue; }
+  if (body.includes('れんだ！')) {
+    for (let t = 0; t < 22; t += 1) await page.locator('.mash__button').click({ force: true });
+    await page.waitForTimeout(3300);
+    continue;
+  }
   if (body.includes('タップして つぎへ')) { await page.locator('.battle-center').click({ force: true }); continue; }
 
   await page.waitForTimeout(120);
@@ -132,11 +146,10 @@ console.log(`--- ${SIZE}vs${SIZE} ---`);
 console.log(JSON.stringify(summary, null, 2));
 await browser.close();
 
-// 1vs1 では、こうかばつぐんやメガシンカが出ないこともある
-const strict = SIZE >= 3;
+// ばつぐん・つかれ・メガシンカ は確率で起きるので、出たかどうかは記録するだけ。
+// それぞれのルール自体はユニットテストと check:timing で確かめている。
 const ok =
   summary.decided &&
-  (!strict || (summary.sawSuperEffective && summary.sawTired && summary.sawMega)) &&
   summary.horizontalOverflowPx === 0 &&
   summary.verticalOverflowPx === 0 &&
   summary.errors.length === 0;

@@ -1,10 +1,8 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { Silhouette } from '../components/Silhouette';
 import { POKEMON_TYPES, SILHOUETTE_SHAPES } from '../domain';
 import type { Pick, PokemonType, SilhouetteShape } from '../domain';
-import { fileToSquareJpeg } from '../image/photo';
 import { TYPE_COLORS } from '../ui/typeColors';
-import { useObjectUrl } from '../ui/useObjectUrl';
 import type { PickInput } from '../db/pickRepository';
 
 interface Props {
@@ -24,22 +22,7 @@ export function PickFormScreen({ pick, onSave, onDelete, onCancel }: Props) {
   const [energy, setEnergy] = useState(pick?.energy ?? 200);
   const [canMegaEvolve, setCanMegaEvolve] = useState(pick?.canMegaEvolve ?? false);
   const [silhouette, setSilhouette] = useState<SilhouetteShape | undefined>(pick?.silhouette);
-  const [photo, setPhoto] = useState<Blob | undefined>(pick?.photo);
-  const [photoError, setPhotoError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
-
-  const fileInput = useRef<HTMLInputElement>(null);
-  const photoUrl = useObjectUrl(photo);
-
-  const choosePhoto = async (file: File | undefined) => {
-    if (!file) return;
-    setPhotoError(null);
-    try {
-      setPhoto(await fileToSquareJpeg(file));
-    } catch {
-      setPhotoError('しゃしんを よみこめませんでした');
-    }
-  };
 
   const canSave = name.trim().length > 0 && energy > 0;
 
@@ -48,45 +31,19 @@ export function PickFormScreen({ pick, onSave, onDelete, onCancel }: Props) {
       <div className="screen__body form">
         <h1 className="title">{pick ? 'ピックを なおす' : 'ピックを とうろく'}</h1>
 
-        {/* しゃしん */}
+        {/* かげ の見本 */}
         <div className="field">
-          <div className="field__label">しゃしん</div>
+          <div className="field__label">かげ</div>
           <div className="photo-row">
             <div className="photo-preview">
-              {photoUrl ? (
-                <img src={photoUrl} alt="とったしゃしん" />
-              ) : (
-                <Silhouette name={name || 'ポケモン'} type={type} shape={silhouette} size={92} />
-              )}
+              <Silhouette name={name || 'ポケモン'} type={type} shape={silhouette} size={92} />
             </div>
-            <div className="photo-actions">
-              {/* iPhone では「写真を撮る/フォトライブラリ/ファイル」が出る */}
-              <input
-                ref={fileInput}
-                type="file"
-                accept="image/*"
-                hidden
-                onChange={(event) => {
-                  void choosePhoto(event.target.files?.[0]);
-                  event.target.value = '';
-                }}
-              />
-              <button
-                type="button"
-                className="btn"
-                onClick={() => fileInput.current?.click()}
-              >
-                📷 しゃしんを とる
-              </button>
-              {photo && (
-                <button type="button" className="btn btn--ghost" onClick={() => setPhoto(undefined)}>
-                  しゃしんを けす
-                </button>
-              )}
-              <p className="hint">とらなくても だいじょうぶ。あとから ふやせます</p>
-            </div>
+            <p className="hint">
+              じっさいの ピックが 手もとに あるので、
+              がめんには かげ だけを だします。
+              かたちは 下から えらべます。
+            </p>
           </div>
-          {photoError && <p className="hint hint--error">{photoError}</p>}
         </div>
 
         {/* なまえ */}
@@ -160,7 +117,7 @@ export function PickFormScreen({ pick, onSave, onDelete, onCancel }: Props) {
 
         {/* かげの形（写真がないときに使う） */}
         <div className="field">
-          <div className="field__label">かげの かたち（しゃしんが ないとき）</div>
+          <div className="field__label">かげの かたち</div>
           <div className="shape-grid">
             {SILHOUETTE_SHAPES.map((shape) => (
               <button
@@ -185,7 +142,7 @@ export function PickFormScreen({ pick, onSave, onDelete, onCancel }: Props) {
             className="btn"
             disabled={!canSave}
             onClick={() =>
-              onSave({ name: name.trim(), type, energy, canMegaEvolve, silhouette, photo })
+              onSave({ name: name.trim(), type, energy, canMegaEvolve, silhouette })
             }
           >
             ほぞん

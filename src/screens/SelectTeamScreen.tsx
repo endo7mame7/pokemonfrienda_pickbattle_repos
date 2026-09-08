@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { PokemonFace } from '../components/PokemonFace';
+import { Silhouette } from '../components/Silhouette';
 import type { Pick, PlayerId } from '../domain';
 import { TYPE_COLORS } from '../ui/typeColors';
 
@@ -65,13 +65,12 @@ export function SelectTeamScreen({
                 onClick={() => toggle(pick.id)}
               >
                 <div className="pick-item__inner">
-                  <PokemonFace
-                    name={pick.name}
-                    type={pick.type}
-                    photo={pick.photo}
-                    shape={pick.silhouette}
-                    size={50}
-                  />
+                  <Silhouette
+          name={pick.name}
+          type={pick.type}
+          shape={pick.silhouette}
+          size={50}
+        />
                   <div className="card__name">{pick.name}</div>
                   <div className="card__type" style={{ background: TYPE_COLORS[pick.type] }}>
                     {pick.type}

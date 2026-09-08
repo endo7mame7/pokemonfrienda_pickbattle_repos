@@ -29,12 +29,26 @@ export class PickBattleDB extends Dexie {
 
   constructor(name = 'pickbattle') {
     super(name);
-    this.version(1).stores({
+    const schema = {
       picks: 'id, name, type, energy, useCount, updatedAt',
       teamPresets: 'id, updatedAt',
       settings: 'key',
       battleLogs: '++id, finishedAt',
-    });
+    };
+    this.version(1).stores(schema);
+
+    // v2: 写真の機能をやめたので、保存ずみの写真を消して容量を返す。
+    // 登録した なまえ・タイプ・エネルギー値 はそのまま残る。
+    this.version(2)
+      .stores(schema)
+      .upgrade((tx) =>
+        tx
+          .table('picks')
+          .toCollection()
+          .modify((pick: Record<string, unknown>) => {
+            delete pick['photo'];
+          }),
+      );
   }
 }
 

@@ -1,10 +1,13 @@
 import { useEffect, useLayoutEffect, useReducer, useRef, useState } from 'react';
 import { AttackAnimation } from '../components/AttackAnimation';
+import { MashGauge } from '../components/MashGauge';
+import { TimingGauge } from '../components/TimingGauge';
 import type { AttackPath } from '../components/AttackAnimation';
 import { Dice } from '../components/Dice';
 import { PokemonCard } from '../components/PokemonCard';
 import { Silhouette } from '../components/Silhouette';
 import {
+  MOVE_NAMES,
   battleReducer,
   createBattle,
   diceCountForTurn,
@@ -13,7 +16,8 @@ import {
   rollDice,
   OPPONENT_OF,
 } from '../domain';
-import type { BattleState, Pick, PlayerId, Settings } from '../domain';
+import type { BattleState, Pick, PlayerId, Settings, TimingMoveKind } from '../domain';
+import { TYPE_COLORS } from '../ui/typeColors';
 import { HandOffScreen } from './HandOffScreen';
 
 interface Props {
@@ -92,6 +96,10 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
   const attackerSide = state.turnPlayer;
   const targetSide = OPPONENT_OF[state.turnPlayer];
   const result = state.lastResult;
+  const attackerPokemon =
+    state.selectedAttackerIndex === null
+      ? null
+      : (state.teams[attackerSide][state.selectedAttackerIndex] ?? null);
   const megaCandidate =
     state.megaCandidateIndex === null
       ? null
@@ -126,8 +134,16 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
         return 'だれを ねらう？';
       case 'rollDice':
         return 'サイコロを ふろう！';
+      case 'chooseMove':
+        return 'どの わざに する？';
+      case 'timing':
+        return 'まんなかで とめよう！';
+      case 'mashing':
+        return attackerPokemon && settings.fatigueEnabled && attackerPokemon.tired
+          ? '💤 つかれてる… もっと れんだ！'
+          : 'ボタンを れんだ！';
       case 'attacking':
-        return `${result?.attackerName}の こうげき！`;
+        return `${result?.attackerName}の ${result?.moveName}！`;
       case 'resolve':
         return result?.targetFainted ? `${result.targetName}は たおれた！` : '';
       default:
@@ -201,6 +217,56 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
         >
           <div className="message">{message}</div>
 
+          {state.phase === 'chooseMove' && attackerPokemon && (
+            <>
+              <div className="move-row">
+                {(['normal', 'strong'] as TimingMoveKind[]).map((move) => (
+                  <button
+                    key={move}
+                    type="button"
+                    className="move-btn"
+                    style={{ background: TYPE_COLORS[attackerPokemon.type] }}
+                    onClick={() => dispatch({ type: 'chooseMove', move })}
+                  >
+                    {MOVE_NAMES[attackerPokemon.type][move]}
+                    <span className="move-btn__sub">
+                      {move === 'normal' ? 'あてやすい' : 'つよいけど むずかしい'}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              {/* メガシンカ中だけ つかえる れんだ わざ */}
+              {attackerPokemon.megaEvolved && (
+                <button
+                  type="button"
+                  className="move-btn move-btn--mega"
+                  onClick={() => dispatch({ type: 'chooseMove', move: 'mega' })}
+                >
+                  🌈 {MOVE_NAMES[attackerPokemon.type].mega}
+                  <span className="move-btn__sub">ねらわなくていい！ ボタンを れんだ</span>
+                </button>
+              )}
+            </>
+          )}
+
+          {state.phase === 'mashing' && attackerPokemon && (
+            <MashGauge
+              type={attackerPokemon.type}
+              tired={settings.fatigueEnabled && attackerPokemon.tired}
+              onFinish={(fill) => dispatch({ type: 'finishMash', fill })}
+            />
+          )}
+
+          {state.phase === 'timing' && state.selectedMove && state.selectedMove !== 'mega' && attackerPokemon && (
+            <TimingGauge
+              move={state.selectedMove}
+              type={attackerPokemon.type}
+              tired={settings.fatigueEnabled && attackerPokemon.tired}
+              megaEvolved={attackerPokemon.megaEvolved}
+              onStop={(position) => dispatch({ type: 'stopTiming', position })}
+            />
+          )}
+
           {(state.phase === 'rollDice' || rolling) && (
             <button
               type="button"
@@ -215,21 +281,45 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
 
           {(state.phase === 'attacking' || state.phase === 'resolve') && result && (
             <>
-              <Dice values={result.rolls} rolling={false} small />
+              {result.rolls && <Dice values={result.rolls} rolling={false} small />}
+              {result.mashFill !== undefined && (
+                <div
+                  className={`timing-result timing-result--${
+                    result.mashFill >= 1 ? 'perfect' : result.mashFill >= 0.6 ? 'near' : 'miss'
+                  }`}
+                >
+                  {result.mashFill >= 1
+                    ? '🌈 MAX！ さいきょう'
+                    : `🌈 ゲージ ${Math.round(result.mashFill * 100)}%`}
+                </div>
+              )}
+              {result.timing && (
+                <div className={`timing-result timing-result--${result.timing}`}>
+                  {result.timing === 'perfect' && '🎯 ぴったり！ 2ばい'}
+                  {result.timing === 'near' && '⭕ ちかい！'}
+                  {result.timing === 'miss' && '💦 はずれ… はんぶん'}
+                </div>
+              )}
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center' }}>
                 {result.isSuperEffective && (
                   <span className="badge badge--super">
                     ⚡ ばつぐん！ +{settings.superEffectiveBonus}
                   </span>
                 )}
-                {result.isTired && <span className="badge badge--tired">💤 つかれて はんぶん</span>}
+                {result.isTired && (
+                  <span className="badge badge--tired">
+                    {settings.attackStyle === 'timing' ? '💤 つかれて ねらいにくい' : '💤 つかれて はんぶん'}
+                  </span>
+                )}
               </div>
               {/* ダメージの数は、当たった場所に大きく出す（下の演出レイヤー） */}
               {state.phase === 'resolve' && <div className="tap-hint">タップして つぎへ 👆</div>}
             </>
           )}
 
-          {(state.phase === 'selectAttacker' || state.phase === 'selectTarget') &&
+          {(state.phase === 'selectAttacker' ||
+            state.phase === 'selectTarget' ||
+            state.phase === 'chooseMove') &&
             !rolling &&
             state.selectedAttackerIndex !== null && (
               <button
@@ -264,7 +354,11 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
             <div className="overlay__title" style={{ fontSize: 22 }}>
               {state.teams[attackerSide][tiredConfirmIndex]?.name}は つかれてるよ
             </div>
-            <p style={{ margin: 0 }}>ダメージが はんぶんに なるけど、それでも いい？</p>
+            <p style={{ margin: 0 }}>
+              {settings.attackStyle === 'timing'
+                ? 'ねらう ところが せまく なるけど、それでも いい？'
+                : 'ダメージが はんぶんに なるけど、それでも いい？'}
+            </p>
             <button
               type="button"
               className="btn"
@@ -323,6 +417,7 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
                   name={megaCandidate.name}
                   type={megaCandidate.type}
                   shape={megaCandidate.silhouette}
+                  mega
                   size={110}
                 />
               </div>

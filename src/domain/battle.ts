@@ -1,4 +1,9 @@
 import { calcDamage } from './damage';
+import type { AttackInput } from './damage';
+import { moveName } from './moves';
+import type { MoveKind } from './moves';
+import { judgeTiming } from './timing';
+import type { TimingResult } from './timing';
 import { diceCountFor } from './dice';
 import { updateFatigue } from './fatigue';
 import { findMegaCandidateIndex } from './megaEvolution';
@@ -12,6 +17,12 @@ export type BattlePhase =
   | 'megaEvolving'
   | 'selectAttacker'
   | 'selectTarget'
+  /** どの わざ を つかう？（タイミングのとき） */
+  | 'chooseMove'
+  /** ゲージを止める（タイミングのとき） */
+  | 'timing'
+  /** ボタンを連打してゲージをためる（メガわざのとき） */
+  | 'mashing'
   | 'rollDice'
   /** サイコロは出たが、まだ当たっていない。攻撃エフェクトを見せる */
   | 'attacking'
@@ -27,7 +38,14 @@ export interface TurnResult {
   targetName: string;
   /** エフェクトを出す位置に使う */
   targetIndex: number;
-  rolls: number[];
+  /** わざの名前。演出とよみあげに使う */
+  moveName: string;
+  /** サイコロのときだけ */
+  rolls?: number[];
+  /** タイミングのときだけ */
+  timing?: TimingResult;
+  /** メガわざのときだけ。ゲージの たまりぐあい（0〜1） */
+  mashFill?: number;
   damage: number;
   isSuperEffective: boolean;
   isTired: boolean;
@@ -41,6 +59,8 @@ export interface BattleState {
   phase: BattlePhase;
   selectedAttackerIndex: number | null;
   selectedTargetIndex: number | null;
+  /** えらんだ わざ（タイミングのとき） */
+  selectedMove: MoveKind | null;
   /** メガシンカ できる自分のポケモン。いなければ null */
   megaCandidateIndex: number | null;
   lastResult: TurnResult | null;
@@ -57,6 +77,12 @@ export type BattleAction =
   | { type: 'selectTarget'; index: number }
   /** 選択をやり直す。サイコロを振るまではいつでも戻れる */
   | { type: 'clearSelection' }
+  /** つかう わざ をえらぶ（タイミングのとき） */
+  | { type: 'chooseMove'; move: MoveKind }
+  /** ゲージを止める。position は 0〜1 で 0.5 がまんなか */
+  | { type: 'stopTiming'; position: number }
+  /** メガわざの連打がおわった。fill は 0〜1 */
+  | { type: 'finishMash'; fill: number }
   | { type: 'rollDice'; rolls: number[] }
   /** 結果の演出が終わった／受け渡し画面を閉じた */
   | { type: 'next' };
@@ -70,7 +96,6 @@ export function toBattlePokemon(pick: Pick): BattlePokemon {
     hp: pick.energy,
     canMegaEvolve: pick.canMegaEvolve,
     ...(pick.silhouette ? { silhouette: pick.silhouette } : {}),
-    ...(pick.photo ? { photo: pick.photo } : {}),
     megaEvolved: false,
     tired: false,
     damageDealt: 0,
@@ -90,6 +115,7 @@ export function createBattle(
     phase: 'selectAttacker',
     selectedAttackerIndex: null,
     selectedTargetIndex: null,
+    selectedMove: null,
     megaCandidateIndex: null,
     lastResult: null,
     winner: null,
@@ -126,6 +152,44 @@ function cloneTeams(teams: Record<PlayerId, BattlePokemon[]>): Record<PlayerId, 
   };
 }
 
+/**
+ * こうげきを計算して、エフェクトを見せる段階へ進む。
+ * ここではまだ当てない（docs/SPEC.md §3.10）。
+ */
+function resolveAttack(state: BattleState, input: AttackInput): BattleState {
+  const attackerIndex = state.selectedAttackerIndex;
+  const targetIndex = state.selectedTargetIndex;
+  if (attackerIndex === null || targetIndex === null) return state;
+
+  const attacker = state.teams[state.turnPlayer][attackerIndex];
+  const target = state.teams[OPPONENT_OF[state.turnPlayer]][targetIndex];
+  if (!attacker || !target) return state;
+
+  const { damage, isSuperEffective, isTired } = calcDamage(attacker, target, input, state.settings);
+
+  return {
+    ...state,
+    phase: 'attacking',
+    lastResult: {
+      attackerName: attacker.name,
+      attackerType: attacker.type,
+      targetName: target.name,
+      targetIndex,
+      moveName: moveName(
+        attacker.type,
+        input.style === 'timing' ? input.move : input.style === 'mash' ? 'mega' : 'normal',
+      ),
+      ...(input.style === 'dice' ? { rolls: input.rolls } : {}),
+      ...(input.style === 'timing' ? { timing: input.timing } : {}),
+      ...(input.style === 'mash' ? { mashFill: input.fill } : {}),
+      damage,
+      isSuperEffective,
+      isTired,
+      targetFainted: false,
+    },
+  };
+}
+
 /** ターンのはじめ。メガシンカ できる子がいれば、まずそれを聞く */
 function startTurn(state: BattleState, turnPlayer: PlayerId): BattleState {
   const megaCandidateIndex = findMegaCandidateIndex(state.teams[turnPlayer], state.settings);
@@ -136,6 +200,7 @@ function startTurn(state: BattleState, turnPlayer: PlayerId): BattleState {
     megaCandidateIndex,
     selectedAttackerIndex: null,
     selectedTargetIndex: null,
+    selectedMove: null,
   };
 }
 
@@ -166,6 +231,7 @@ export function battleReducer(state: BattleState, action: BattleAction): BattleS
         phase: 'selectTarget',
         selectedAttackerIndex: action.index,
         selectedTargetIndex: null,
+        selectedMove: null,
       };
     }
 
@@ -173,53 +239,69 @@ export function battleReducer(state: BattleState, action: BattleAction): BattleS
       if (state.phase !== 'selectTarget' && state.phase !== 'rollDice') return state;
       const pokemon = state.teams[OPPONENT_OF[state.turnPlayer]][action.index];
       if (!pokemon || !isAlive(pokemon)) return state;
-      return { ...state, phase: 'rollDice', selectedTargetIndex: action.index };
+      // タイミングのときは わざ をえらんでから、サイコロのときはそのまま振る
+      return {
+        ...state,
+        phase: state.settings.attackStyle === 'timing' ? 'chooseMove' : 'rollDice',
+        selectedTargetIndex: action.index,
+      };
     }
 
     case 'clearSelection': {
-      // サイコロを振ったあとは戻れない
-      if (state.phase !== 'selectTarget' && state.phase !== 'rollDice') return state;
+      // こうげきが始まったあとは戻れない
+      const undoable: BattlePhase[] = ['selectTarget', 'rollDice', 'chooseMove'];
+      if (!undoable.includes(state.phase)) return state;
       return {
         ...state,
         phase: 'selectAttacker',
         selectedAttackerIndex: null,
         selectedTargetIndex: null,
+        selectedMove: null,
       };
+    }
+
+    case 'chooseMove': {
+      if (state.phase !== 'chooseMove') return state;
+      const attacker =
+        state.selectedAttackerIndex === null
+          ? undefined
+          : state.teams[state.turnPlayer][state.selectedAttackerIndex];
+      // メガわざは メガシンカ中の子だけ
+      if (action.move === 'mega' && !attacker?.megaEvolved) return state;
+      return {
+        ...state,
+        phase: action.move === 'mega' ? 'mashing' : 'timing',
+        selectedMove: action.move,
+      };
+    }
+
+    case 'finishMash': {
+      if (state.phase !== 'mashing') return state;
+      return resolveAttack(state, { style: 'mash', fill: action.fill });
+    }
+
+    case 'stopTiming': {
+      if (state.phase !== 'timing' || state.selectedMove === null || state.selectedMove === 'mega') {
+        return state;
+      }
+      const attacker =
+        state.selectedAttackerIndex === null
+          ? undefined
+          : state.teams[state.turnPlayer][state.selectedAttackerIndex];
+      if (!attacker) return state;
+      return resolveAttack(state, {
+        style: 'timing',
+        move: state.selectedMove,
+        timing: judgeTiming(action.position, state.selectedMove, {
+          tired: state.settings.fatigueEnabled && attacker.tired,
+          megaEvolved: attacker.megaEvolved,
+        }),
+      });
     }
 
     case 'rollDice': {
       if (state.phase !== 'rollDice') return state;
-      const attackerIndex = state.selectedAttackerIndex;
-      const targetIndex = state.selectedTargetIndex;
-      if (attackerIndex === null || targetIndex === null) return state;
-
-      const attacker = state.teams[state.turnPlayer][attackerIndex];
-      const target = state.teams[OPPONENT_OF[state.turnPlayer]][targetIndex];
-      if (!attacker || !target) return state;
-
-      // ここでは当てない。攻撃エフェクトを見せてから当てる
-      const { damage, isSuperEffective, isTired } = calcDamage(
-        attacker,
-        target,
-        action.rolls,
-        state.settings,
-      );
-
-      return {
-        ...state,
-        phase: 'attacking',
-        lastResult: {
-          attackerName: attacker.name,
-          attackerType: attacker.type,
-          targetName: target.name,
-          targetIndex,
-          rolls: action.rolls,
-          damage,
-          isSuperEffective,
-          isTired,
-          targetFainted: false,
-        },
-      };
+      return resolveAttack(state, { style: 'dice', rolls: action.rolls });
     }
 
     case 'next': {

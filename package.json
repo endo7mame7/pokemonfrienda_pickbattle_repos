@@ -12,7 +12,9 @@
     "typecheck": "tsc --noEmit",
     "smoke": "node tools/smoke-test.mjs",
     "check:pickbook": "node tools/pickbook-check.mjs",
-    "preview:effects": "node tools/effect-preview.mjs"
+    "preview:effects": "node tools/effect-preview.mjs",
+    "check:timing": "node tools/timing-check.mjs",
+    "check:mega": "node tools/mega-check.mjs"
   },
   "dependencies": {
     "dexie": "^4.0.10",

@@ -1,3 +1,8 @@
+import { movePower } from './moves';
+import type { TimingMoveKind } from './moves';
+import { mashMultiplier } from './mash';
+import { TIMING_MULTIPLIER } from './timing';
+import type { TimingResult } from './timing';
 import { isSuperEffective } from './typeChart';
 import type { BattlePokemon, Settings } from './types';
 
@@ -6,6 +11,9 @@ export function ceilTo10(n: number): number {
   return Math.ceil(n / 10) * 10;
 }
 
+/** メガシンカ中はタイミングの威力が上がる（サイコロのときは2個になる） */
+export const MEGA_POWER_MULTIPLIER = 1.5;
+
 export interface DamageResult {
   damage: number;
   isSuperEffective: boolean;
@@ -13,23 +21,42 @@ export interface DamageResult {
   isTired: boolean;
 }
 
+/** サイコロの出目か、わざ＋タイミングか。どちらで攻撃したか */
+export type AttackInput =
+  | { style: 'dice'; rolls: number[] }
+  | { style: 'timing'; move: TimingMoveKind; timing: TimingResult }
+  /** メガわざ。fill は ゲージの たまりぐあい（0〜1） */
+  | { style: 'mash'; fill: number };
+
 /**
- * ダメージ = ( 出目の合計 × ばいりつ + ばつぐんボーナス ) ÷ つかれ
+ * ダメージ = ( もとの ちから + ばつぐんボーナス ) ÷ つかれ
  * docs/SPEC.md §3.4
  */
 export function calcDamage(
   attacker: BattlePokemon,
   target: BattlePokemon,
-  rolls: number[],
+  input: AttackInput,
   settings: Settings,
 ): DamageResult {
-  const diceSum = rolls.reduce((sum, roll) => sum + roll, 0);
   const superEffective = isSuperEffective(attacker.type, target.type);
   const tired = settings.fatigueEnabled && attacker.tired;
+  // タイミング方式では、つかれは「ねらう ところが せまくなる」で表す（§3.7）。
+  // ダメージを半分にするのは サイコロ方式のときだけ。
+  const halvesDamage = tired && input.style === 'dice';
 
-  let damage = diceSum * settings.damageMultiplier;
+  const megaBoost = attacker.megaEvolved ? MEGA_POWER_MULTIPLIER : 1;
+  let damage: number;
+  if (input.style === 'dice') {
+    damage = input.rolls.reduce((sum, roll) => sum + roll, 0) * settings.damageMultiplier;
+  } else if (input.style === 'timing') {
+    damage =
+      movePower(input.move, settings.battleSpeed) * TIMING_MULTIPLIER[input.timing] * megaBoost;
+  } else {
+    damage = movePower('mega', settings.battleSpeed) * mashMultiplier(input.fill) * megaBoost;
+  }
+
   if (superEffective) damage += settings.superEffectiveBonus;
-  if (tired) damage = ceilTo10(damage / 2);
+  if (halvesDamage) damage /= 2;
 
-  return { damage, isSuperEffective: superEffective, isTired: tired };
+  return { damage: ceilTo10(damage), isSuperEffective: superEffective, isTired: tired };
 }

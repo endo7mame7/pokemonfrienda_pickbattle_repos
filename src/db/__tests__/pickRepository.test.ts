@@ -34,13 +34,11 @@ describe('ピックの保存', () => {
     expect(saved[0]!.energy).toBe(180);
   });
 
-  it('写真とかげの形もいっしょに保存できる', async () => {
-    const photo = new Blob(['dummy'], { type: 'image/jpeg' });
-    await savePick(createPick({ ...base, photo, silhouette: 'まる' }));
+  it('かげの形も いっしょに保存できる', async () => {
+    await savePick(createPick({ ...base, silhouette: 'まる' }));
 
     const [saved] = await listPicks();
     expect(saved!.silhouette).toBe('まる');
-    expect(saved!.photo).toBeInstanceOf(Blob);
   });
 
   it('けすと なくなる', async () => {
@@ -72,13 +70,9 @@ describe('ピックの書きかえ', () => {
     expect(applyInput(pick, base).useCount).toBe(7);
   });
 
-  it('写真をはずすと、ちゃんと消える', () => {
-    const photo = new Blob(['x'], { type: 'image/jpeg' });
-    const pick = createPick({ ...base, photo, silhouette: 'まる' });
-    const updated = applyInput(pick, base);
-
-    expect(updated.photo).toBeUndefined();
-    expect(updated.silhouette).toBeUndefined();
+  it('かげの形を えらびなおさないと、ちゃんと消える', () => {
+    const pick = createPick({ ...base, silhouette: 'まる' });
+    expect(applyInput(pick, base).silhouette).toBeUndefined();
   });
 });
 
