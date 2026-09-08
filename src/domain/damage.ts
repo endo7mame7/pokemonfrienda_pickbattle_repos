@@ -1,7 +1,7 @@
 import { movePower } from './moves';
 import type { TimingMoveKind } from './moves';
 import { mashMultiplier } from './mash';
-import { TIMING_MULTIPLIER } from './timing';
+import { timingMultiplier } from './timing';
 import type { TimingResult } from './timing';
 import { isSuperEffective } from './typeChart';
 import type { BattlePokemon, Settings } from './types';
@@ -50,9 +50,17 @@ export function calcDamage(
     damage = input.rolls.reduce((sum, roll) => sum + roll, 0) * settings.damageMultiplier;
   } else if (input.style === 'timing') {
     damage =
-      movePower(input.move, settings.battleSpeed) * TIMING_MULTIPLIER[input.timing] * megaBoost;
+      movePower(input.move, settings.battleSpeed) *
+      timingMultiplier(input.move, input.timing) *
+      megaBoost;
   } else {
     damage = movePower('mega', settings.battleSpeed) * mashMultiplier(input.fill) * megaBoost;
+  }
+
+  // つよいわざ を はずすと まるごと 0。ばつぐん ボーナスも のらない
+  // （「はずれ なのに ばつぐん +20」に ならないように）
+  if (damage === 0) {
+    return { damage: 0, isSuperEffective: false, isTired: tired };
   }
 
   if (superEffective) damage += settings.superEffectiveBonus;

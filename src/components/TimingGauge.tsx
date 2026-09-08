@@ -57,6 +57,13 @@ export function TimingGauge({ move, type, tired, megaEvolved, onStop }: Props) {
           className="gauge__zone gauge__zone--near"
           style={{ left: percent(0.5 - zones.near), width: percent(zones.near * 2) }}
         />
+        {/* あいだの はずれ（つよいわざ だけ）。ここで止めると 0ダメージ */}
+        {zones.gap > zones.perfect && (
+          <div
+            className="gauge__zone gauge__zone--gap"
+            style={{ left: percent(0.5 - zones.gap), width: percent(zones.gap * 2) }}
+          />
+        )}
         {/* ぴったり ゾーン */}
         <div
           className="gauge__zone gauge__zone--perfect"
@@ -73,6 +80,7 @@ export function TimingGauge({ move, type, tired, megaEvolved, onStop }: Props) {
         {megaEvolved && '🌈 メガシンカで ねらいやすい！ '}
         まんなかで タップ！
       </div>
+      {move === 'strong' && <div className="gauge__warn">⚫ くろい ところは 0ダメージ！</div>}
     </button>
   );
 }

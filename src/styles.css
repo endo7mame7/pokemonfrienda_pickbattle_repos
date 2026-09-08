@@ -1117,6 +1117,15 @@ body {
   background: #fff0b8;
 }
 
+/* あいだの はずれ。ここで止めると 0ダメージ */
+.gauge__zone--gap {
+  background: repeating-linear-gradient(
+    -45deg,
+    #4a4a55 0 6px,
+    #35353e 6px 12px
+  );
+}
+
 .gauge__zone--perfect {
   opacity: 0.9;
 }
@@ -1136,6 +1145,17 @@ body {
   font-size: 17px;
   font-weight: 700;
   color: var(--ink-soft);
+}
+
+.badge--mega-end {
+  background: #ede7ff;
+  color: #5b3fbf;
+}
+
+.gauge__warn {
+  font-size: 14px;
+  font-weight: 700;
+  color: #b3261e;
 }
 
 /* わざ えらび */

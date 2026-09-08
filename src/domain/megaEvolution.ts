@@ -5,12 +5,13 @@ import type { BattlePokemon, Settings } from './types';
  * メガシンカ できる状態かどうか（docs/SPEC.md §3.6）。
  * 条件を満たしても自動では発動しない。自分のターンのはじめに
  * 「メガシンカする？」と聞き、プレイヤーが選ぶ。
- * ひんしになった場合は発動できない。
+ * ひんしになった場合と、メガわざ で ちからを つかいきったあとは発動できない。
  */
 export function shouldMegaEvolve(pokemon: BattlePokemon, settings: Settings): boolean {
   const ratio = MEGA_THRESHOLD_RATIO[settings.megaThreshold];
   if (ratio === null) return false;
-  if (!pokemon.canMegaEvolve || pokemon.megaEvolved || pokemon.hp <= 0) return false;
+  if (!pokemon.canMegaEvolve || pokemon.megaEvolved || pokemon.megaUsed) return false;
+  if (pokemon.hp <= 0) return false;
 
   // hp <= maxHp × (numerator / denominator) を、小数を使わずに判定する
   return pokemon.hp * ratio.denominator <= pokemon.maxHp * ratio.numerator;

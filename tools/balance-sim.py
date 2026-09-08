@@ -134,19 +134,22 @@ def _stats(**kwargs):
 
 
 # ── タイミング方式（docs/SPEC.md §3.4）
-MOVE_POWER = {'normal': 110, 'strong': 190}
+MOVE_POWER = {'normal': 110, 'strong': 220}
 SPEED_SCALE = {'fast': 1.4, 'normal': 1.0, 'slow': 0.7}
 TIMING_MULT = {'perfect': 2.0, 'near': 1.0, 'miss': 0.5}
+# はずした ときの ばいりつ。つよいわざ だけ 0（docs/SPEC.md §3.4）
+MISS_MULT = {'normal': 0.5, 'strong': 0.0}
 # 園児の うでまえ の想定（ぴったり / ちかい の確率）
 # まんなかに どれくらい 寄せられるか（0 = でたらめ、1 = かならず まんなか）
 SKILL = {'園児': 0.0, '大人': 0.45}
 
 
 # ねらう はば の ばいすう（docs/SPEC.md §3.6・§3.7）
-TIRED_ZONE = {'perfect': 0.5, 'near': 0.7}
-MEGA_ZONE = {'perfect': 1.5, 'near': 1.2}
-BASE_ZONE = {'normal': {'perfect': 0.12, 'near': 0.32},
-             'strong': {'perfect': 0.06, 'near': 0.22}}
+TIRED_ZONE = {'perfect': 0.5, 'gap_width': 1.4, 'near': 0.7}
+MEGA_ZONE = {'perfect': 1.5, 'gap_width': 0.7, 'near': 1.2}
+# gap_width は ぴったり の すぐ そとに おく「あいだの はずれ」の はば
+BASE_ZONE = {'normal': {'perfect': 0.12, 'gap_width': 0.0, 'near': 0.32},
+             'strong': {'perfect': 0.06, 'gap_width': 0.06, 'near': 0.26}}
 
 
 def timing_result(move, tired, mega, skill):
@@ -156,16 +159,21 @@ def timing_result(move, tired, mega, skill):
     うまい人ほど まんなか に寄るので、その ぶん を skill_bias で足す。
     """
     zone = BASE_ZONE[move]
-    perfect = zone['perfect'] * (TIRED_ZONE['perfect'] if tired else 1) * (MEGA_ZONE['perfect'] if mega else 1)
-    near = zone['near'] * (TIRED_ZONE['near'] if tired else 1) * (MEGA_ZONE['near'] if mega else 1)
+    def scaled(key):
+        return zone[key] * (TIRED_ZONE[key] if tired else 1) * (MEGA_ZONE[key] if mega else 1)
+    perfect = scaled('perfect')
+    gap = perfect + scaled('gap_width')     # ここまでが「あいだの はずれ」
+    near = max(scaled('near'), gap)
     bias = skill  # 0 = でたらめ、大きいほど まんなかに寄る
     # まんなかからの ずれ。bias が大きいほど 0 に近くなる
     distance = abs(random.random() - 0.5) * (1 - bias)
     if distance <= perfect:
         return 'perfect'
+    if distance <= gap:
+        return 'miss'   # あいだの はずれ
     if distance <= near:
         return 'near'
-    return 'miss'
+    return 'miss'       # そとの はずれ
 
 
 def timing_battle(size, speed='normal', skill=SKILL['園児'], strong_rate=0.45,
@@ -189,10 +197,11 @@ def timing_battle(size, speed='normal', skill=SKILL['園児'], strong_rate=0.45,
         was_tired = fatigue and attacker['tired']
         result = timing_result(move, was_tired, attacker['mega'], skill)
 
-        damage = MOVE_POWER[move] * SPEED_SCALE[speed] * TIMING_MULT[result]
+        mult = MISS_MULT[move] if result == 'miss' else TIMING_MULT[result]
+        damage = MOVE_POWER[move] * SPEED_SCALE[speed] * mult
         if attacker['mega']:
             damage *= 1.5
-        if target['type'] in CHART[attacker['type']]:
+        if damage > 0 and target['type'] in CHART[attacker['type']]:
             damage += bonus
         # つかれても ダメージは減らさない。ねらう はば が せまくなる ぶん で効く
         damage = ceil_to_10(int(damage))
@@ -234,7 +243,7 @@ def main():
                   f"約{mean * SECONDS_PER_TURN / 60:4.1f}分")
         print()
 
-    print("■ タイミング方式（既定）— わざ ふつう110 / つよい190")
+    print("■ タイミング方式（既定）— わざ ふつう110 / つよい220（はずすと 0）")
     for label, skill in SKILL.items():
         for speed in ('fast', 'normal', 'slow'):
             row = f"  {label} {speed:<7}: "

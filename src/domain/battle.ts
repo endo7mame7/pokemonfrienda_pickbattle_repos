@@ -52,6 +52,8 @@ export interface TurnResult {
   isSuperEffective: boolean;
   isTired: boolean;
   targetFainted: boolean;
+  /** メガわざ を つかって、メガシンカ が とけたか */
+  megaEnded: boolean;
 }
 
 export interface BattleState {
@@ -99,6 +101,7 @@ export function toBattlePokemon(pick: Pick): BattlePokemon {
     canMegaEvolve: pick.canMegaEvolve,
     ...(pick.silhouette ? { silhouette: pick.silhouette } : {}),
     megaEvolved: false,
+    megaUsed: false,
     tired: false,
     damageDealt: 0,
   };
@@ -188,6 +191,7 @@ function resolveAttack(state: BattleState, input: AttackInput): BattleState {
       isSuperEffective,
       isTired,
       targetFainted: false,
+      megaEnded: false,
     },
   };
 }
@@ -327,6 +331,14 @@ export function battleReducer(state: BattleState, action: BattleAction): BattleS
         target.hp = Math.max(0, target.hp - result.damage);
         attacker.damageDealt += result.damage;
 
+        // メガわざ は ちからを つかいきる わざ。うつと メガシンカ が とけて、
+        // もう一度は メガシンカ できない（docs/SPEC.md §3.6）
+        const megaEnded = result.moveKind === 'mega' && attacker.megaEvolved;
+        if (megaEnded) {
+          attacker.megaEvolved = false;
+          attacker.megaUsed = true;
+        }
+
         if (state.settings.fatigueEnabled) {
           updateFatigue(attackerTeam, attackerIndex);
         }
@@ -336,7 +348,7 @@ export function battleReducer(state: BattleState, action: BattleAction): BattleS
           ...state,
           teams,
           phase: 'resolve',
-          lastResult: { ...result, targetFainted: target.hp === 0 },
+          lastResult: { ...result, targetFainted: target.hp === 0, megaEnded },
         };
       }
 

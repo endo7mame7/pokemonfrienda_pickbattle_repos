@@ -79,7 +79,13 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
     const from = center(`${state.turnPlayer}-${state.selectedAttackerIndex}`);
     const to = center(`${OPPONENT_OF[state.turnPlayer]}-${result.targetIndex}`);
     if (from && to) {
-      setPath({ fromX: from.x, fromY: from.y, toX: to.x, toY: to.y });
+      setPath({
+        fromX: from.x,
+        fromY: from.y,
+        toX: to.x,
+        toY: to.y,
+        areaWidth: body.getBoundingClientRect().width,
+      });
     }
   }, [state.phase, state.lastResult, state.selectedAttackerIndex, state.turnPlayer]);
 
@@ -247,7 +253,7 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
                   >
                     {MOVE_NAMES[attackerPokemon.type][move]}
                     <span className="move-btn__sub">
-                      {move === 'normal' ? 'あてやすい' : 'つよいけど むずかしい'}
+                      {move === 'normal' ? 'あてやすい' : 'つよい！ はずすと 0'}
                     </span>
                   </button>
                 ))}
@@ -260,7 +266,9 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
                   onClick={() => dispatch({ type: 'chooseMove', move: 'mega' })}
                 >
                   🌈 {MOVE_NAMES[attackerPokemon.type].mega}
-                  <span className="move-btn__sub">ねらわなくていい！ ボタンを れんだ</span>
+                  <span className="move-btn__sub">
+                    れんだ するだけ！ でも メガシンカ は おわる
+                  </span>
                 </button>
               )}
             </>
@@ -314,7 +322,8 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
                 <div className={`timing-result timing-result--${result.timing}`}>
                   {result.timing === 'perfect' && '🎯 ぴったり！ 2ばい'}
                   {result.timing === 'near' && '⭕ ちかい！'}
-                  {result.timing === 'miss' && '💦 はずれ… はんぶん'}
+                  {result.timing === 'miss' &&
+                    (result.moveKind === 'strong' ? '💦 はずれ… 0ダメージ' : '💦 はずれ… はんぶん')}
                 </div>
               )}
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center' }}>
@@ -327,6 +336,9 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
                   <span className="badge badge--tired">
                     {settings.attackStyle === 'timing' ? '💤 つかれて ねらいにくい' : '💤 つかれて はんぶん'}
                   </span>
+                )}
+                {state.phase === 'resolve' && result.megaEnded && (
+                  <span className="badge badge--mega-end">🌀 メガシンカ が とけた</span>
                 )}
               </div>
               {/* ダメージの数は、当たった場所に大きく出す（下の演出レイヤー） */}
@@ -419,7 +431,7 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
             </div>
             <p style={{ margin: 0 }}>
               {settings.attackStyle === 'timing'
-                ? 'ちからが つよくなって、ねらう ところも ひろく なるよ。メガわざ も つかえる！'
+                ? 'ちからが つよくなって、ねらう ところも ひろく なるよ。1かいだけ うてる メガわざ も つかえる！'
                 : 'メガシンカ すると サイコロが 2こに なるよ'}
             </p>
             <button type="button" className="btn" onClick={() => dispatch({ type: 'megaEvolve' })}>
