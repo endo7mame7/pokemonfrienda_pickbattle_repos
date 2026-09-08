@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { PokemonFace } from '../components/PokemonFace';
+import { Silhouette } from '../components/Silhouette';
 import type { Pick } from '../domain';
 import type { PickSort } from '../db/pickRepository';
 import { TYPE_COLORS } from '../ui/typeColors';
@@ -80,13 +80,12 @@ export function PickBookScreen({
                 onClick={() => onEdit(pick)}
               >
                 <div className="pick-item__inner">
-                  <PokemonFace
-                    name={pick.name}
-                    type={pick.type}
-                    photo={pick.photo}
-                    shape={pick.silhouette}
-                    size={54}
-                  />
+                  <Silhouette
+          name={pick.name}
+          type={pick.type}
+          shape={pick.silhouette}
+          size={54}
+        />
                   <div className="card__name">{pick.name}</div>
                   <div className="card__type" style={{ background: TYPE_COLORS[pick.type] }}>
                     {pick.type}

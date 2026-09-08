@@ -124,5 +124,125 @@ function renderShape(shape: SilhouetteShape) {
           <circle cx="61" cy="44" r="6" fill="#fff" opacity="0.65" />
         </>
       );
+    case 'きょだい':
+      return (
+        <>
+          <polygon points="34,18 30,2 46,12" />
+          <polygon points="66,18 70,2 54,12" />
+          <circle cx="50" cy="26" r="18" />
+          <ellipse cx="50" cy="62" rx="33" ry="27" />
+          <ellipse cx="20" cy="56" rx="9" ry="15" transform="rotate(18 20 56)" />
+          <ellipse cx="80" cy="56" rx="9" ry="15" transform="rotate(-18 80 56)" />
+          <ellipse cx="35" cy="87" rx="14" ry="7" />
+          <ellipse cx="65" cy="87" rx="14" ry="7" />
+        </>
+      );
+    case 'とげとげ':
+      return (
+        <>
+          {Array.from({ length: 12 }, (_, i) => {
+            const angle = (Math.PI * 2 * i) / 12;
+            const x = 50 + Math.cos(angle) * 26;
+            const y = 56 + Math.sin(angle) * 26;
+            const tipX = 50 + Math.cos(angle) * 42;
+            const tipY = 56 + Math.sin(angle) * 42;
+            const side = angle + Math.PI / 2;
+            return (
+              <polygon
+                key={i}
+                points={`${x + Math.cos(side) * 7},${y + Math.sin(side) * 7} ${tipX},${tipY} ${
+                  x - Math.cos(side) * 7
+                },${y - Math.sin(side) * 7}`}
+              />
+            );
+          })}
+          <circle cx="50" cy="56" r="27" />
+        </>
+      );
+    case 'ドラゴン':
+      return (
+        <>
+          <polygon points="40,44 6,20 14,58" />
+          <polygon points="60,44 94,20 86,58" />
+          <ellipse cx="50" cy="56" rx="19" ry="24" />
+          <circle cx="50" cy="26" r="15" />
+          <polygon points="38,18 32,2 48,12" />
+          <polygon points="62,18 68,2 52,12" />
+          <path d="M50 80 C50 94 30 92 24 84" stroke="currentColor" strokeWidth="8" fill="none" strokeLinecap="round" />
+        </>
+      );
+    case 'いわ':
+      return (
+        <>
+          <polygon points="24,16 46,6 64,14 58,30 34,32" />
+          <polygon points="16,40 40,30 68,32 84,46 78,74 22,72" />
+          <polygon points="8,52 20,44 22,66" />
+          <polygon points="92,52 80,44 78,66" />
+          <rect x="28" y="72" width="14" height="18" rx="5" />
+          <rect x="58" y="72" width="14" height="18" rx="5" />
+          <circle cx="40" cy="50" r="5" fill="#fff" opacity="0.45" />
+          <circle cx="60" cy="50" r="5" fill="#fff" opacity="0.45" />
+        </>
+      );
+    case 'しょくぶつ':
+      return (
+        <>
+          <rect x="46" y="46" width="8" height="42" rx="4" />
+          <ellipse cx="26" cy="58" rx="18" ry="9" transform="rotate(-20 26 58)" />
+          <ellipse cx="74" cy="58" rx="18" ry="9" transform="rotate(20 74 58)" />
+          {Array.from({ length: 6 }, (_, i) => {
+            const angle = (Math.PI * 2 * i) / 6;
+            return (
+              <ellipse
+                key={i}
+                cx={50 + Math.cos(angle) * 15}
+                cy={30 + Math.sin(angle) * 15}
+                rx="9"
+                ry="9"
+              />
+            );
+          })}
+          <circle cx="50" cy="30" r="10" fill="#fff" opacity="0.55" />
+        </>
+      );
+    case 'くらげ':
+      return (
+        <>
+          <path d="M18 56 A32 32 0 0 1 82 56 Z" />
+          <path
+            d="M28 58 C26 72 34 74 30 88 M42 60 C40 74 48 78 44 90 M58 60 C60 74 52 78 56 90 M72 58 C74 72 66 74 70 88"
+            stroke="currentColor"
+            strokeWidth="6"
+            fill="none"
+            strokeLinecap="round"
+          />
+        </>
+      );
+    case 'ロボット':
+      return (
+        <>
+          <rect x="47" y="6" width="6" height="12" rx="3" />
+          <circle cx="50" cy="6" r="5" />
+          <rect x="30" y="18" width="40" height="30" rx="8" />
+          <circle cx="40" cy="33" r="5" fill="#fff" opacity="0.6" />
+          <circle cx="60" cy="33" r="5" fill="#fff" opacity="0.6" />
+          <rect x="34" y="52" width="32" height="30" rx="6" />
+          <rect x="16" y="54" width="12" height="24" rx="6" />
+          <rect x="72" y="54" width="12" height="24" rx="6" />
+          <rect x="36" y="84" width="12" height="10" rx="4" />
+          <rect x="52" y="84" width="12" height="10" rx="4" />
+        </>
+      );
+    case 'こうら':
+      return (
+        <>
+          <circle cx="78" cy="46" r="13" />
+          <path d="M14 68 A34 30 0 0 1 82 68 Z" />
+          <ellipse cx="50" cy="68" rx="34" ry="7" />
+          <rect x="22" y="70" width="11" height="18" rx="5" />
+          <rect x="67" y="70" width="11" height="18" rx="5" />
+          <circle cx="50" cy="52" r="9" fill="#fff" opacity="0.35" />
+        </>
+      );
   }
 }

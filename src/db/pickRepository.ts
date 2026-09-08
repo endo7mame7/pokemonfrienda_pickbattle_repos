@@ -9,7 +9,6 @@ export interface PickInput {
   energy: number;
   canMegaEvolve: boolean;
   silhouette?: SilhouetteShape | undefined;
-  photo?: Blob | undefined;
 }
 
 function newId(): string {
@@ -25,18 +24,16 @@ export function createPick(input: PickInput, now = Date.now()): Pick {
     energy: input.energy,
     canMegaEvolve: input.canMegaEvolve,
     ...(input.silhouette ? { silhouette: input.silhouette } : {}),
-    ...(input.photo ? { photo: input.photo } : {}),
     useCount: 0,
     createdAt: now,
     updatedAt: now,
   };
 }
 
-/** 既存のピックに入力を反映する（写真とかげは未指定なら消す） */
+/** 既存のピックに入力を反映する（かげの形は未指定なら消す） */
 export function applyInput(pick: Pick, input: PickInput, now = Date.now()): Pick {
-  const { silhouette, photo, ...rest } = pick;
+  const { silhouette, ...rest } = pick;
   void silhouette;
-  void photo;
   return {
     ...rest,
     name: input.name,
@@ -44,7 +41,6 @@ export function applyInput(pick: Pick, input: PickInput, now = Date.now()): Pick
     energy: input.energy,
     canMegaEvolve: input.canMegaEvolve,
     ...(input.silhouette ? { silhouette: input.silhouette } : {}),
-    ...(input.photo ? { photo: input.photo } : {}),
     updatedAt: now,
   };
 }

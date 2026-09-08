@@ -13,6 +13,7 @@ export type PokemonType = (typeof POKEMON_TYPES)[number];
  */
 export const SILHOUETTE_SHAPES = [
   'まる', 'よつあし', 'にそく', 'つばさ', 'へび', 'さかな', 'むし', 'おばけ',
+  'きょだい', 'とげとげ', 'ドラゴン', 'いわ', 'しょくぶつ', 'くらげ', 'ロボット', 'こうら',
 ] as const;
 
 export type SilhouetteShape = (typeof SILHOUETTE_SHAPES)[number];
@@ -54,8 +55,6 @@ export interface BattlePokemon {
   hp: number;
   canMegaEvolve: boolean;
   silhouette?: SilhouetteShape;
-  /** 実物ピックの写真。あれば かげ の代わりに表示する */
-  photo?: Blob;
   megaEvolved: boolean;
   /** 全力で攻撃した次のターン。ダメージが半分になる */
   tired: boolean;
