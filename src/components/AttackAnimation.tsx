@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef, useState } from 'react';
 import { Silhouette } from './Silhouette';
 import { TYPE_EFFECTS, effectIntensity, particleCount } from '../ui/attackEffects';
 import { TYPE_COLORS } from '../ui/typeColors';
@@ -9,6 +10,8 @@ export interface AttackPath {
   fromY: number;
   toX: number;
   toY: number;
+  /** バトル画面の はば。ダメージの数が はみ出さないように使う */
+  areaWidth: number;
 }
 
 /** カットインに出す こうげきする子 */
@@ -78,11 +81,7 @@ export function AttackAnimation({
   }
 
   if (stage === 'damage') {
-    return (
-      <div className="fx-layer" style={style}>
-        <div className="fx-damage">-{damage}</div>
-      </div>
-    );
+    return <DamagePop damage={damage} path={path} style={style} />;
   }
 
   return (
@@ -117,6 +116,50 @@ export function AttackAnimation({
             {index % 3 === 0 && isMega ? '✨' : particle}
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+
+/**
+ * ダメージの数。当たった場所に出すが、画面の そと に はみ出すと 数が読めない。
+ * 出したあとに 大きさ を はかって、はみ出すぶんだけ 内側へ寄せる
+ * （アニメで じぶんの 高さの 1.5ばい ぶん 上に ういる）。
+ */
+function DamagePop({
+  damage,
+  path,
+  style,
+}: {
+  damage: number;
+  path: AttackPath;
+  style: React.CSSProperties;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState<{ width: number; height: number } | null>(null);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (el) setSize({ width: el.offsetWidth, height: el.offsetHeight });
+  }, [damage]);
+
+  const MARGIN = 4;
+  const halfWidth = (size?.width ?? 0) / 2;
+  const maxX = Math.max(path.areaWidth - halfWidth - MARGIN, halfWidth + MARGIN);
+  const x = Math.min(Math.max(path.toX, halfWidth + MARGIN), maxX);
+  const y = Math.max(path.toY, (size?.height ?? 0) * 1.5 + MARGIN);
+
+  const damageStyle = {
+    ...style,
+    ['--fx-to-x' as string]: `${x}px`,
+    ['--fx-to-y' as string]: `${y}px`,
+  };
+
+  return (
+    <div className="fx-layer" style={damageStyle}>
+      <div className="fx-damage" ref={ref}>
+        -{damage}
       </div>
     </div>
   );

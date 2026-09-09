@@ -51,6 +51,19 @@ await shot('03-teamsize');
 
 const SIZE = Number(process.env.TEAM_SIZE ?? 3);
 await page.getByText(`${SIZE}たい${SIZE}`).click();
+
+// メガシンカ できる子は チームに 1たい だけ。2たいめは えらべないはず
+let megaLimitWorks = null;
+if (SIZE >= 2) {
+  await page.getByText('リザードン', { exact: true }).click();   // メガシンカ できる
+  // aria-disabled になっているので、むりやり おしても えらばれないことを たしかめる
+  await page.getByText('カメックス', { exact: true }).click({ force: true });
+  const blocked = await page.locator('.pick-item--blocked').count();
+  megaLimitWorks = (await page.locator('.pick-item--selected').count()) === 1 && blocked > 0;
+  await shot('03b-mega-limit');
+  await page.getByText('リザードン', { exact: true }).click();   // えらびなおす
+}
+
 // あかチーム
 for (const name of ['リザードン', 'ピカチュウ', 'カビゴン'].slice(0, SIZE)) {
   await page.getByText(name, { exact: true }).click();
@@ -59,7 +72,7 @@ await shot('04-selectteam');
 await page.getByText('けってい').click();
 
 await tap('じゅんび できた');
-for (const name of ['フシギバナ', 'ゲンガー', 'ギャラドス'].slice(0, SIZE)) {
+for (const name of ['フシギバナ', 'ミミッキュ', 'ハガネール'].slice(0, SIZE)) {
   await page.getByText(name, { exact: true }).click();
 }
 await page.getByText('けってい').click();
@@ -93,7 +106,6 @@ while (turns < 900) {
     continue;
   }
   if (body.includes('スマホを わたしてね')) { await page.getByText('じゅんび できた').click(); continue; }
-  if (body.includes('こうげき する！')) { await page.getByText('こうげき する！').click(); continue; }
   if (body.includes('ばつぐん！')) sawSuperEffective = true;
   if (body.includes('つかれて')) sawTired = true;
 
@@ -137,6 +149,7 @@ const summary = {
   sawSuperEffective,
   sawTired,
   sawMega,
+  megaLimitWorks,
   horizontalOverflowPx: overflow,
   verticalOverflowPx: verticalOverflow,
   errors,
@@ -150,6 +163,7 @@ await browser.close();
 // それぞれのルール自体はユニットテストと check:timing で確かめている。
 const ok =
   summary.decided &&
+  megaLimitWorks !== false &&   // メガシンカ できる子を 2たい えらべてしまっていない
   summary.horizontalOverflowPx === 0 &&
   summary.verticalOverflowPx === 0 &&
   summary.errors.length === 0;

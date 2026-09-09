@@ -5,7 +5,7 @@ import type { MoveKind } from './moves';
 import { judgeTiming } from './timing';
 import type { TimingResult } from './timing';
 import { diceCountFor } from './dice';
-import { updateFatigue } from './fatigue';
+import { clearFatigueIfAlone, updateFatigue } from './fatigue';
 import { findMegaCandidateIndex } from './megaEvolution';
 import { OPPONENT_OF } from './types';
 import type { BattlePokemon, Pick, PlayerId, PokemonType, Settings } from './types';
@@ -52,6 +52,8 @@ export interface TurnResult {
   isSuperEffective: boolean;
   isTired: boolean;
   targetFainted: boolean;
+  /** メガわざ を つかって、メガシンカ が とけたか */
+  megaEnded: boolean;
 }
 
 export interface BattleState {
@@ -99,6 +101,7 @@ export function toBattlePokemon(pick: Pick): BattlePokemon {
     canMegaEvolve: pick.canMegaEvolve,
     ...(pick.silhouette ? { silhouette: pick.silhouette } : {}),
     megaEvolved: false,
+    megaUsed: false,
     tired: false,
     damageDealt: 0,
   };
@@ -188,15 +191,21 @@ function resolveAttack(state: BattleState, input: AttackInput): BattleState {
       isSuperEffective,
       isTired,
       targetFainted: false,
+      megaEnded: false,
     },
   };
 }
 
 /** ターンのはじめ。メガシンカ できる子がいれば、まずそれを聞く */
 function startTurn(state: BattleState, turnPlayer: PlayerId): BattleState {
-  const megaCandidateIndex = findMegaCandidateIndex(state.teams[turnPlayer], state.settings);
+  const teams = cloneTeams(state.teams);
+  // 仲間がたおれて1体だけになったら、つかれは消す（もう交代できないため）
+  if (state.settings.fatigueEnabled) clearFatigueIfAlone(teams[turnPlayer]);
+
+  const megaCandidateIndex = findMegaCandidateIndex(teams[turnPlayer], state.settings);
   return {
     ...state,
+    teams,
     turnPlayer,
     phase: megaCandidateIndex === null ? 'selectAttacker' : 'megaPrompt',
     megaCandidateIndex,
@@ -322,8 +331,16 @@ export function battleReducer(state: BattleState, action: BattleAction): BattleS
         target.hp = Math.max(0, target.hp - result.damage);
         attacker.damageDealt += result.damage;
 
+        // メガわざ は ちからを つかいきる わざ。うつと メガシンカ が とけて、
+        // もう一度は メガシンカ できない（docs/SPEC.md §3.6）
+        const megaEnded = result.moveKind === 'mega' && attacker.megaEvolved;
+        if (megaEnded) {
+          attacker.megaEvolved = false;
+          attacker.megaUsed = true;
+        }
+
         if (state.settings.fatigueEnabled) {
-          updateFatigue(attackerTeam, attackerIndex, result.isTired);
+          updateFatigue(attackerTeam, attackerIndex);
         }
         // メガシンカはここでは起こさない。やられた側が自分のターンのはじめに選ぶ
 
@@ -331,7 +348,7 @@ export function battleReducer(state: BattleState, action: BattleAction): BattleS
           ...state,
           teams,
           phase: 'resolve',
-          lastResult: { ...result, targetFainted: target.hp === 0 },
+          lastResult: { ...result, targetFainted: target.hp === 0, megaEnded },
         };
       }
 

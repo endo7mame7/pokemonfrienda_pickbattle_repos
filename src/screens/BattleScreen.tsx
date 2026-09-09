@@ -1,5 +1,7 @@
 import { useEffect, useLayoutEffect, useReducer, useRef, useState } from 'react';
 import { AttackAnimation } from '../components/AttackAnimation';
+import { MegaEndEffect } from '../components/MegaEndEffect';
+import { MegaEvolveCutIn } from '../components/MegaEvolveCutIn';
 import { MashGauge } from '../components/MashGauge';
 import { TimingGauge } from '../components/TimingGauge';
 import type { AttackPath } from '../components/AttackAnimation';
@@ -37,9 +39,7 @@ const CUT_IN_MS: Record<MoveKind, number> = { normal: 700, strong: 900, mega: 13
 /** 飛んでいって 当たって、はじけ終わるまで */
 const STRIKE_MS = 1350;
 
-/** 対面で遊ぶので、チームの場所は入れかわらない。あかは上、あおは下で固定 */
-const TOP: PlayerId = 'p1';
-const BOTTOM: PlayerId = 'p2';
+
 
 export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFinish }: Props) {
   const [state, dispatch] = useReducer(
@@ -81,7 +81,13 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
     const from = center(`${state.turnPlayer}-${state.selectedAttackerIndex}`);
     const to = center(`${OPPONENT_OF[state.turnPlayer]}-${result.targetIndex}`);
     if (from && to) {
-      setPath({ fromX: from.x, fromY: from.y, toX: to.x, toY: to.y });
+      setPath({
+        fromX: from.x,
+        fromY: from.y,
+        toX: to.x,
+        toY: to.y,
+        areaWidth: body.getBoundingClientRect().width,
+      });
     }
   }, [state.phase, state.lastResult, state.selectedAttackerIndex, state.turnPlayer]);
 
@@ -138,12 +144,11 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
     }, ROLL_ANIMATION_MS);
   };
 
-  const turnName = playerNames[attackerSide];
   const message = (() => {
     if (rolling) return 'サイコロ ころころ…';
     switch (state.phase) {
       case 'selectAttacker':
-        return `${turnName}の ばん。だれで こうげきする？`;
+        return 'だれで こうげきする？';
       case 'selectTarget':
         return 'だれを ねらう？';
       case 'rollDice':
@@ -168,6 +173,10 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
   const canPickAttacker =
     !rolling && (state.phase === 'selectAttacker' || state.phase === 'selectTarget');
   const canPickTarget = !rolling && (state.phase === 'selectTarget' || state.phase === 'rollDice');
+
+  // 手番のプレイヤーが いつも手前（下）に来るよう、上下を入れかえる
+  const topSide = targetSide;
+  const bottomSide = attackerSide;
 
   const renderTeam = (side: PlayerId) => {
     const isAttackerSide = side === attackerSide;
@@ -213,15 +222,17 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
     <div
       className={`team-label team-label--${side}${side === attackerSide ? ' team-label--turn' : ''}`}
     >
-      {playerNames[side]}チーム{side === attackerSide ? '（いま こうげき）' : ''}
+      {side === attackerSide
+        ? `じぶん（${playerNames[side]}）`
+        : `あいて（${playerNames[side]}）`}
     </div>
   );
 
   return (
     <div className="screen">
       <div className="screen__body screen__body--battle" ref={bodyRef}>
-        {teamLabel(TOP)}
-        {renderTeam(TOP)}
+        {teamLabel(topSide)}
+        {renderTeam(topSide)}
 
         <div
           className={
@@ -244,7 +255,7 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
                   >
                     {MOVE_NAMES[attackerPokemon.type][move]}
                     <span className="move-btn__sub">
-                      {move === 'normal' ? 'あてやすい' : 'つよいけど むずかしい'}
+                      {move === 'normal' ? 'あてやすい' : 'つよい！ はずすと 0'}
                     </span>
                   </button>
                 ))}
@@ -257,7 +268,9 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
                   onClick={() => dispatch({ type: 'chooseMove', move: 'mega' })}
                 >
                   🌈 {MOVE_NAMES[attackerPokemon.type].mega}
-                  <span className="move-btn__sub">ねらわなくていい！ ボタンを れんだ</span>
+                  <span className="move-btn__sub">
+                    れんだ するだけ！ でも メガシンカ は おわる
+                  </span>
                 </button>
               )}
             </>
@@ -311,7 +324,8 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
                 <div className={`timing-result timing-result--${result.timing}`}>
                   {result.timing === 'perfect' && '🎯 ぴったり！ 2ばい'}
                   {result.timing === 'near' && '⭕ ちかい！'}
-                  {result.timing === 'miss' && '💦 はずれ… はんぶん'}
+                  {result.timing === 'miss' &&
+                    (result.moveKind === 'strong' ? '💦 はずれ… 0ダメージ' : '💦 はずれ… はんぶん')}
                 </div>
               )}
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center' }}>
@@ -324,6 +338,9 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
                   <span className="badge badge--tired">
                     {settings.attackStyle === 'timing' ? '💤 つかれて ねらいにくい' : '💤 つかれて はんぶん'}
                   </span>
+                )}
+                {state.phase === 'resolve' && result.megaEnded && (
+                  <span className="badge badge--mega-end">🌀 メガシンカ が とけた</span>
                 )}
               </div>
               {/* ダメージの数は、当たった場所に大きく出す（下の演出レイヤー） */}
@@ -346,8 +363,8 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
             )}
         </div>
 
-        {renderTeam(BOTTOM)}
-        {teamLabel(BOTTOM)}
+        {renderTeam(bottomSide)}
+        {teamLabel(bottomSide)}
 
         {path && result && attackerPokemon && (state.phase === 'attacking' || state.phase === 'resolve') && (
           <AttackAnimation
@@ -365,6 +382,11 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
             isSuperEffective={result.isSuperEffective}
             stage={state.phase === 'resolve' ? 'damage' : stage}
           />
+        )}
+
+        {/* メガわざ で ちからを つかいきった。オーラが とけていく */}
+        {path && result?.megaEnded && state.phase === 'resolve' && (
+          <MegaEndEffect key={`mega-end-${state.turnCount}`} path={path} />
         )}
       </div>
 
@@ -414,7 +436,11 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
             <div className="overlay__title" style={{ fontSize: 22 }}>
               {megaCandidate.name}は メガシンカ できる！
             </div>
-            <p style={{ margin: 0 }}>メガシンカ すると サイコロが 2こに なるよ</p>
+            <p style={{ margin: 0 }}>
+              {settings.attackStyle === 'timing'
+                ? 'ちからが つよくなって、ねらう ところも ひろく なるよ。1かいだけ うてる メガわざ も つかえる！'
+                : 'メガシンカ すると サイコロが 2こに なるよ'}
+            </p>
             <button type="button" className="btn" onClick={() => dispatch({ type: 'megaEvolve' })}>
               🌈 メガシンカ する！
             </button>
@@ -431,30 +457,24 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
 
       {state.phase === 'megaEvolving' && megaCandidate && (
         <div className="overlay">
-          <div className="mega-stage">
-            <div className="mega-stage__glow">
-              <div className="mega-stage__figure">
-                <Silhouette
-                  name={megaCandidate.name}
-                  type={megaCandidate.type}
-                  shape={megaCandidate.silhouette}
-                  mega
-                  size={110}
-                />
-              </div>
-            </div>
-            <div className="mega-stage__title">🌈 メガシンカ！</div>
-            <div className="tap-hint" style={{ color: '#fff' }}>
-              {megaCandidate.name}の サイコロが 2こに なった！
-            </div>
-          </div>
-          <div className="mega-flash" />
+          <MegaEvolveCutIn
+            key={`mega-cutin-${state.turnCount}-${megaCandidate.pickId}`}
+            name={megaCandidate.name}
+            type={megaCandidate.type}
+            shape={megaCandidate.silhouette}
+            caption={
+              settings.attackStyle === 'timing'
+                ? 'ちからが あふれだした！'
+                : 'サイコロが 2こに なった！'
+            }
+          />
         </div>
       )}
 
       {state.phase === 'handOff' && (
         <HandOffScreen
           playerName={playerNames[targetSide]}
+          passPhone
           onContinue={() => dispatch({ type: 'next' })}
         />
       )}

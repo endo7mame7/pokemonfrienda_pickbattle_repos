@@ -56,6 +56,8 @@ export interface BattlePokemon {
   canMegaEvolve: boolean;
   silhouette?: SilhouetteShape;
   megaEvolved: boolean;
+  /** メガわざ を つかって ちからを つかいきった。もう メガシンカ できない */
+  megaUsed: boolean;
   /** 全力で攻撃した次のターン。ダメージが半分になる */
   tired: boolean;
   /** MVP 判定に使う累計与ダメージ */

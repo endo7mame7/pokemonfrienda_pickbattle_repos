@@ -16,7 +16,8 @@ export type TimingMoveKind = Exclude<MoveKind, 'mega'>;
  */
 export const MOVE_POWER: Record<MoveKind, number> = {
   normal: 110,
-  strong: 190,
+  /** はずすと 0ダメージ。そのぶん 当たったときは 大きい（docs/SPEC.md §3.4.1） */
+  strong: 220,
   /** メガわざ。ねらう必要がないぶん、最大は つよいわざ の ぴったり より ひかえめ */
   mega: 150,
 };

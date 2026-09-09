@@ -37,11 +37,11 @@ await page.getByText('みほんの 12たいを いれる').click();
 await page.getByText('もどる').click();
 await page.locator('.mode').first().click();
 await page.getByText('1たい1').click();
-// メガシンカ できて たいりょくが ひくい子
-await page.getByText('サーナイト', { exact: true }).click();
+// メガシンカ できて、一撃ではたおれない子
+await page.getByText('リザードン', { exact: true }).click();
 await page.getByText('けってい').click();
 await page.getByText('じゅんび できた').click();
-await page.getByText('サーナイト', { exact: true }).click();
+await page.getByText('リザードン', { exact: true }).click();
 await page.getByText('けってい').click();
 await page.getByText('コインを なげる').click();
 await page.waitForTimeout(1500);
@@ -51,20 +51,30 @@ let sawPrompt = false;
 let sawMegaMove = false;
 let mashFill = null;
 let megaAuraInCard = 0;
+let damageBox = null;          // ダメージの数が 画面に おさまっているか
+let megaCutInShown = 0;        // メガシンカ せんよう の カットイン
+let megaEndFxShown = null;     // メガシンカ が とける ときの エフェクト
+let sawMegaEnded = false;      // 「メガシンカ が とけた」の ひょうじ
+let megaCardsAfter = null;     // メガわざ の あと、かげ が もどっているか
 
 for (let i = 0; i < 400 && mashFill === null; i += 1) {
   const body = await page.locator('body').innerText();
   if (body.includes('の かち！')) break;
 
-  if (body.includes('こうげき する！')) { await page.getByText('こうげき する！').click(); continue; }
+  // 手番が変わったら スマホを わたす
+  if (body.includes('スマホを わたしてね')) { await page.getByText('じゅんび できた').click(); continue; }
   if (body.includes('つかれてるよ')) { await page.getByText('これで いく').click(); continue; }
   if (body.includes('メガシンカ できる！')) {
     sawPrompt = true;
     await shot('40-mega-prompt');
     await page.getByText('メガシンカ する！').click();
-    await page.waitForTimeout(1500);
-    await shot('41-mega-animation');
-    await page.waitForTimeout(1200);
+    await page.waitForTimeout(600);
+    await shot('41a-mega-charge');    // ひかりを ためている ところ
+    await page.waitForTimeout(900);
+    await shot('41b-mega-reveal');    // すがたが かわった ところ
+    // せんよう カットイン が 出ているか
+    megaCutInShown = await page.locator('.mega-cutin').count();
+    await page.waitForTimeout(1100);
     // カードの かげ が つよそうな すがた に変わっているか
     megaAuraInCard = await page.locator('.card--mega svg polygon').count();
     await shot('42-mega-card');
@@ -85,7 +95,7 @@ for (let i = 0; i < 400 && mashFill === null; i += 1) {
       await shot('43-move-choice-with-mega');
       await mega.click();
     } else {
-      await page.locator('.move-btn').nth(1).click();
+      await page.locator('.move-btn').nth(0).click(); // ふつう わざ（一撃でたおさない）
     }
     continue;
   }
@@ -100,6 +110,28 @@ for (let i = 0; i < 400 && mashFill === null; i += 1) {
     await shot('46-mega-cutin');               // メガわざ の カットイン
     await page.waitForTimeout(1500);
     await shot('47-mega-impact');              // メガわざ の 着弾
+    // ダメージの数が 見切れていないか（いちばん大きい数で ためす）
+    for (let t = 0; t < 40 && damageBox === null; t += 1) {
+      damageBox = await page.evaluate(() => {
+        const el = document.querySelector('.fx-damage');
+        if (!el) return null;
+        const r = el.getBoundingClientRect();
+        return { left: Math.round(r.left), top: Math.round(r.top),
+                 right: Math.round(r.right), bottom: Math.round(r.bottom) };
+      });
+      if (damageBox === null) await page.waitForTimeout(50);
+    }
+    if (damageBox !== null) {
+      await page.waitForTimeout(700); // ういて とまる まで まってから はかる
+      damageBox = await page.evaluate(() => {
+        const el = document.querySelector('.fx-damage');
+        if (!el) return null;
+        const r = el.getBoundingClientRect();
+        return { left: Math.round(r.left), top: Math.round(r.top),
+                 right: Math.round(r.right), bottom: Math.round(r.bottom) };
+      });
+      await shot('47b-damage');
+    }
     await page.waitForTimeout(1400);
     continue;
   }
@@ -110,7 +142,14 @@ for (let i = 0; i < 400 && mashFill === null; i += 1) {
   }
   if (body.includes('タップして つぎへ')) {
     const m = body.match(/ゲージ (\d+)%|MAX/);
-    if (m) { mashFill = m[0]; await shot('48-mash-result'); }
+    if (m) {
+      mashFill = m[0];
+      // メガわざ を うつと ちからを つかいきって もとの すがた に もどる
+      sawMegaEnded = body.includes('メガシンカ が とけた');
+      megaCardsAfter = await page.locator('.card--mega').count();
+      megaEndFxShown = await page.locator('.mega-end__ring').count();
+      await shot('48-mash-result');
+    }
     await page.locator('.battle-center').click({ force: true });
     continue;
   }
@@ -122,7 +161,12 @@ const overflow = await page.evaluate(() => ({
   y: document.documentElement.scrollHeight - document.documentElement.clientHeight,
 }));
 
-const summary = { sawPrompt, sawMegaMove, megaAuraInCard, mashResult: mashFill, overflow, errors };
+const damageFits =
+  damageBox !== null &&
+  damageBox.left >= 0 && damageBox.top >= 0 &&
+  damageBox.right <= 375 && damageBox.bottom <= 667;
+
+const summary = { sawPrompt, megaCutInShown, megaEndFxShown, sawMegaMove, megaAuraInCard, mashResult: mashFill, sawMegaEnded, megaCardsAfter, damageBox, damageFits, overflow, errors };
 console.log(JSON.stringify(summary, null, 2));
 await browser.close();
 
@@ -130,6 +174,11 @@ const ok =
   sawPrompt && sawMegaMove &&
   megaAuraInCard > 0 &&          // かげが つよそうな すがた に変わっている
   mashFill !== null &&           // れんだ の結果が出た
+  megaCutInShown > 0 &&          // メガシンカ せんよう の カットイン が出る
+  sawMegaEnded &&                // メガシンカ が とけた と出る
+  megaEndFxShown > 0 &&          // とける エフェクト が出る
+  damageFits &&                  // ダメージの数が 見切れていない
+  megaCardsAfter === 0 &&        // かげ が もとに もどっている
   overflow.x === 0 && overflow.y === 0 &&
   errors.length === 0;
 

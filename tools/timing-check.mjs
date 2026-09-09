@@ -32,12 +32,12 @@ await page.getByText('みほんの 12たいを いれる').click();
 await page.getByText('もどる').click();
 await page.locator('.mode').first().click();
 await page.getByText(`${SIZE}たい${SIZE}`).click();
-for (const n of ['リザードン', 'ピカチュウ', 'カメックス'].slice(0, SIZE)) {
+for (const n of ['リザードン', 'ピカチュウ', 'カビゴン'].slice(0, SIZE)) {
   await page.getByText(n, { exact: true }).click();
 }
 await page.getByText('けってい').click();
 await page.getByText('じゅんび できた').click();
-for (const n of ['フシギバナ', 'ゲンガー', 'ギャラドス'].slice(0, SIZE)) {
+for (const n of ['フシギバナ', 'ミミッキュ', 'ハガネール'].slice(0, SIZE)) {
   await page.getByText(n, { exact: true }).click();
 }
 await page.getByText('けってい').click();
@@ -46,6 +46,8 @@ await page.waitForTimeout(1500);
 await page.getByText('バトル スタート').click();
 
 const seen = { perfect: false, near: false, miss: false, strong: false, normal: false };
+let gapZoneShown = null;   // つよいわざ の「あいだの はずれ」帯が 出ているか
+let sawStrongZero = false; // つよいわざ を はずすと 0ダメージ
 let rounds = 0;
 let decided = false;
 let shotMove = false;
@@ -56,7 +58,8 @@ for (let i = 0; i < 900; i += 1) {
   const body = await page.locator('body').innerText();
   if (body.includes('の かち！')) { decided = true; break; }
 
-  if (body.includes('こうげき する！')) { await page.getByText('こうげき する！').click(); continue; }
+  // 手番が変わったら スマホを わたす
+  if (body.includes('スマホを わたしてね')) { await page.getByText('じゅんび できた').click(); continue; }
   if (body.includes('つかれてるよ')) { await page.getByText('これで いく').click(); continue; }
   if (body.includes('メガシンカ できる！')) {
     await page.getByText('メガシンカ する！').click();
@@ -81,7 +84,11 @@ for (let i = 0; i < 900; i += 1) {
     continue;
   }
   if (body.includes('まんなかで とめよう')) {
-    if (!shotGauge) { await shot('31-gauge'); shotGauge = true; }
+    // つよいわざ のときだけ「あいだの はずれ」帯が 見えているはず
+    const isStrong = await page.locator('.gauge__warn').count();
+    const gaps = await page.locator('.gauge__zone--gap').count();
+    if (isStrong) { gapZoneShown = gaps; if (!shotGauge) { await shot('31-gauge-strong'); shotGauge = true; } }
+    else if (gaps !== 0) { errors.push('ふつうわざ に あいだの はずれ帯 が出ている'); }
     await page.locator('.gauge').click({ force: true });
     await page.waitForTimeout(2400); // カットイン + 飛んで 当たる まで
     continue;
@@ -90,6 +97,7 @@ for (let i = 0; i < 900; i += 1) {
     if (body.includes('ぴったり')) seen.perfect = true;
     if (body.includes('ちかい')) seen.near = true;
     if (body.includes('はずれ')) seen.miss = true;
+    if (body.includes('はずれ… 0ダメージ')) sawStrongZero = true;
     if (!shotResult) { await shot('32-result'); shotResult = true; }
     await page.locator('.battle-center').click({ force: true });
     continue;
@@ -103,7 +111,7 @@ const overflow = await page.evaluate(() => ({
   y: document.documentElement.scrollHeight - document.documentElement.clientHeight,
 }));
 
-const summary = { size: SIZE, decided, waza: rounds, seen, overflow, errors };
+const summary = { size: SIZE, decided, waza: rounds, seen, gapZoneShown, sawStrongZero, overflow, errors };
 console.log(JSON.stringify(summary, null, 2));
 await browser.close();
 
@@ -111,6 +119,7 @@ const ok =
   decided &&
   seen.normal && seen.strong &&
   (seen.perfect || seen.near || seen.miss) &&
+  gapZoneShown === 1 &&   // つよいわざ の ゲージに あいだの はずれ帯 が出ている
   overflow.x === 0 && overflow.y === 0 &&
   errors.length === 0;
 

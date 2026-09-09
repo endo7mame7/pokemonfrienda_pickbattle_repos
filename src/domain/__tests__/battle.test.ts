@@ -321,8 +321,14 @@ describe('バトルの進行', () => {
     expect(state.megaCandidateIndex).toBe(1);
   });
 
-  it('つかれた状態で攻撃するとダメージが半分になる', () => {
-    let state = createBattle([makePick()], [makePick({ energy: 350 })], 'p1', settings);
+  it('つかれた状態で攻撃するとダメージが半分になる（サイコロ方式）', () => {
+    // つかれは 交代できるとき だけ。2体いる状態で ためす
+    let state = createBattle(
+      [makePick(), makePick()],
+      [makePick({ energy: 350 })],
+      'p1',
+      settings,
+    );
     state = attack(state, 0, 0, [3]); // 全力 60
     expect(state.lastResult?.damage).toBe(60);
     expect(state.teams.p1[0]!.tired).toBe(true);
@@ -331,7 +337,39 @@ describe('バトルの進行', () => {
     state = attack(state, 0, 0, [3]); // つかれて 30
     expect(state.lastResult?.damage).toBe(30);
     expect(state.lastResult?.isTired).toBe(true);
-    expect(state.teams.p1[0]!.tired).toBe(false); // 攻撃後は元気に戻る
+    // つかれは 休まないと とれない
+    expect(state.teams.p1[0]!.tired).toBe(true);
+  });
+
+  it('つかれは 休んだときだけ とれる', () => {
+    let state = createBattle(
+      [makePick({ name: 'A' }), makePick({ name: 'B' })],
+      [makePick({ energy: 350 })],
+      'p1',
+      settings,
+    );
+    state = opponentTurn(attack(state, 0, 0, [1])); // A が攻撃 → つかれる
+    expect(state.teams.p1[0]!.tired).toBe(true);
+
+    state = opponentTurn(attack(state, 1, 0, [1])); // B が攻撃 → A は休んで回復
+    expect(state.teams.p1[0]!.tired).toBe(false);
+    expect(state.teams.p1[1]!.tired).toBe(true);
+  });
+
+  it('1体だけになったら つかれない（交代できないため）', () => {
+    let state = createBattle(
+      [makePick(), makePick({ energy: 10 })],
+      [makePick({ energy: 350 })],
+      'p1',
+      settings,
+    );
+    state = opponentTurn(attack(state, 0, 0, [3]));
+    expect(state.teams.p1[0]!.tired).toBe(true); // まだ2体いるので つかれる
+
+    // 2体目を たおして 1体だけにする
+    state.teams.p1[1]!.hp = 0;
+    state = opponentTurn(attack(state, 0, 0, [3]));
+    expect(state.teams.p1[0]!.tired).toBe(false);
   });
 
   it('MVP はいちばん多くダメージを与えた子', () => {
@@ -404,6 +442,115 @@ describe('タイミング方式の進行', () => {
   it('タイミング方式では サイコロを振っても なにも起きない', () => {
     const state = battleReducer(start(), { type: 'rollDice', rolls: [6] });
     expect(state.phase).toBe('chooseMove');
+  });
+});
+
+describe('メガわざ は ちからを つかいきる（docs/SPEC.md §3.6）', () => {
+  const timingSettings = makeSettings({
+    attackStyle: 'timing',
+    fatigueEnabled: false,
+    megaThreshold: 'half',
+  });
+
+  /** あいてに 1発もらって たいりょくを へらし、p1 を メガシンカ ずみ にする */
+  function megaReady() {
+    let state = createBattle(
+      [makePick({ canMegaEvolve: true, energy: 400 })],
+      [makePick({ energy: 3000 })],
+      'p2', // あいてが さきに こうげき する
+      timingSettings,
+    );
+    state = apply(
+      state,
+      ...timingTurn('normal', 0.5), // ぴったり。p1 は はんぶん 以下 になる
+    );
+    expect(state.phase).toBe('megaPrompt');
+    state = apply(state, { type: 'megaEvolve' }, { type: 'next' });
+    expect(state.teams.p1[0]!.megaEvolved).toBe(true);
+    return state;
+  }
+
+  /** 1vs1 で 1ターンぶん（わざ えらび 〜 つぎの手番のはじめ まで）進める */
+  function timingTurn(move: 'normal' | 'strong', position: number): BattleAction[] {
+    return [
+      { type: 'selectAttacker', index: 0 },
+      { type: 'selectTarget', index: 0 },
+      { type: 'chooseMove', move },
+      { type: 'stopTiming', position },
+      { type: 'next' }, // attacking → resolve
+      { type: 'next' }, // resolve → handOff
+      { type: 'next' }, // handOff → あいての ターン
+    ];
+  }
+
+  it('メガシンカ中だけ メガわざ を えらべる', () => {
+    const normal = apply(
+      createBattle([makePick()], [makePick({ energy: 900 })], 'p1', timingSettings),
+      { type: 'selectAttacker', index: 0 },
+      { type: 'selectTarget', index: 0 },
+      { type: 'chooseMove', move: 'mega' },
+    );
+    expect(normal.phase).toBe('chooseMove'); // えらべない
+
+    const mega = apply(
+      megaReady(),
+      { type: 'selectAttacker', index: 0 },
+      { type: 'selectTarget', index: 0 },
+      { type: 'chooseMove', move: 'mega' },
+    );
+    expect(mega.phase).toBe('mashing');
+  });
+
+  it('メガわざ を うつと メガシンカ が とける', () => {
+    const state = apply(
+      megaReady(),
+      { type: 'selectAttacker', index: 0 },
+      { type: 'selectTarget', index: 0 },
+      { type: 'chooseMove', move: 'mega' },
+      { type: 'finishMash', fill: 1 },
+      { type: 'next' },
+    );
+    expect(state.lastResult?.megaEnded).toBe(true);
+    expect(state.teams.p1[0]!.megaEvolved).toBe(false);
+    expect(state.teams.p1[0]!.megaUsed).toBe(true);
+  });
+
+  it('ふつう・つよい わざ では メガシンカ は とけない', () => {
+    for (const move of ['normal', 'strong'] as const) {
+      const state = apply(
+        megaReady(),
+        { type: 'selectAttacker', index: 0 },
+        { type: 'selectTarget', index: 0 },
+        { type: 'chooseMove', move },
+        { type: 'stopTiming', position: 0.5 },
+        { type: 'next' },
+      );
+      expect(state.lastResult?.megaEnded).toBe(false);
+      expect(state.teams.p1[0]!.megaEvolved).toBe(true);
+    }
+  });
+
+  it('つかいきったら もう一度は メガシンカ できない', () => {
+    let state = apply(
+      megaReady(),
+      { type: 'selectAttacker', index: 0 },
+      { type: 'selectTarget', index: 0 },
+      { type: 'chooseMove', move: 'mega' },
+      { type: 'finishMash', fill: 1 },
+      { type: 'next' }, // attacking → resolve
+      { type: 'next' }, // resolve → handOff
+      { type: 'next' }, // handOff → あいての ターン
+    );
+    // あいての ターン は わざと はずして、p1 が たおれないようにする
+    state = apply(state, ...timingTurn('normal', 0));
+
+    expect(state.turnPlayer).toBe('p1');
+    const self = state.teams.p1[0]!;
+    // たいりょくは まだ はんぶん 以下 なのに、もう きかれない
+    expect(self.hp).toBeGreaterThan(0);
+    expect(self.hp * 2).toBeLessThanOrEqual(self.maxHp);
+    expect(state.megaCandidateIndex).toBeNull();
+    expect(state.phase).toBe('selectAttacker');
   });
 });
 
