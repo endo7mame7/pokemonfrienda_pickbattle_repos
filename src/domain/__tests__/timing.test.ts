@@ -4,53 +4,62 @@ import { MOVE_POWER, moveName } from '../moves';
 import { POKEMON_TYPES } from '../types';
 import {
   GAUGE_SPEED_SCALE,
-  MEGA_SIGMA_SCALE,
-  MOVE_CURVE,
-  TIRED_SIGMA_SCALE,
+  MEGA_STEP_SCALE,
+  MOVE_STEPS,
+  TIRED_STEP_SCALE,
   gaugeCycleMs,
   judgeTiming,
-  ratioAt,
-  ratioAtDistance,
-  sigmaFor,
-  zonesFor,
+  stepIndexAtDistance,
+  stepPowerAt,
+  stepsFor,
 } from '../timing';
 import { makePokemon, makeSettings } from './testHelpers';
 
-describe('あたりかたの カーブ（docs/SPEC.md §3.4.1）', () => {
-  it('まんなかが さいだい で、はなれるほど かならず 小さくなる', () => {
+describe('あたりかたの 段（docs/SPEC.md §3.4.1）', () => {
+  it('いちばん内がわ の ちから は MOVE_POWER と そろっている', () => {
     for (const kind of ['normal', 'strong'] as const) {
-      expect(ratioAtDistance(kind, 0)).toBeCloseTo(1);
-      let previous = 1;
-      for (let d = 0.01; d <= 0.5; d += 0.01) {
-        const ratio = ratioAtDistance(kind, d);
-        // 谷 が できない（近づくほど 損、が おきない）
-        expect(ratio).toBeLessThanOrEqual(previous + 1e-9);
-        previous = ratio;
+      expect(MOVE_STEPS[kind][0]!.power).toBe(MOVE_POWER[kind]);
+    }
+  });
+
+  it('外へ いくほど ちから が 下がる（谷が ない）', () => {
+    for (const kind of ['normal', 'strong'] as const) {
+      const steps = MOVE_STEPS[kind];
+      for (let i = 1; i < steps.length; i += 1) {
+        expect(steps[i]!.power).toBeLessThan(steps[i - 1]!.power);
+        expect(steps[i]!.until).toBeGreaterThan(steps[i - 1]!.until);
+      }
+      expect(steps[steps.length - 1]!.until).toBe(0.5);
+    }
+  });
+
+  it('つよいわざ は まんなかの段が せまく、ちから が 大きい', () => {
+    expect(MOVE_STEPS.strong[0]!.until).toBeLessThan(MOVE_STEPS.normal[0]!.until);
+    expect(MOVE_STEPS.strong[0]!.power).toBeGreaterThan(MOVE_STEPS.normal[0]!.power);
+  });
+
+  it('ふつうわざ は はずしても ちから が のこる／つよいわざ は 0 になる', () => {
+    expect(MOVE_STEPS.normal[MOVE_STEPS.normal.length - 1]!.power).toBeGreaterThan(0);
+    expect(MOVE_STEPS.strong[MOVE_STEPS.strong.length - 1]!.power).toBe(0);
+  });
+
+  it('どこで とめても どれかの段に 入る', () => {
+    for (const kind of ['normal', 'strong'] as const) {
+      for (const tired of [false, true]) {
+        for (const megaEvolved of [false, true]) {
+          for (let d = 0; d <= 0.5; d += 0.01) {
+            const index = stepIndexAtDistance(kind, d, { tired, megaEvolved });
+            expect(index).toBeGreaterThanOrEqual(0);
+            expect(index).toBeLessThan(MOVE_STEPS[kind].length);
+          }
+        }
       }
     }
   });
 
-  it('つよいわざ は とがっていて、ふつうわざ は なだらか', () => {
-    expect(MOVE_CURVE.strong.sigma).toBeLessThan(MOVE_CURVE.normal.sigma);
-    // おなじ ずれ でも つよいわざ のほうが がくんと 落ちる
-    expect(ratioAtDistance('strong', 0.12)).toBeLessThan(ratioAtDistance('normal', 0.12));
-  });
-
-  it('ふつうわざ は はずしても floor までしか 下がらない', () => {
-    expect(MOVE_CURVE.normal.floor).toBeGreaterThan(0);
-    expect(ratioAtDistance('normal', 0.5)).toBeGreaterThan(MOVE_CURVE.normal.floor * 0.99);
-  });
-
-  it('つよいわざ は 大きく はずすと きっちり 0 になる', () => {
-    const { zero } = zonesFor('strong');
-    expect(zero).toBeLessThan(0.5);
-    expect(ratioAtDistance('strong', zero + 0.01)).toBe(0);
-    expect(ratioAtDistance('strong', 0.5)).toBe(0);
-  });
-
-  it('左右どちらに ずれても おなじ', () => {
+  it('左右どちらに ずれても おなじ段', () => {
     for (const distance of [0.05, 0.15, 0.4]) {
-      expect(ratioAt(0.5 - distance, 'normal')).toBeCloseTo(ratioAt(0.5 + distance, 'normal'));
+      expect(stepPowerAt(0.5 - distance, 'normal')).toBe(stepPowerAt(0.5 + distance, 'normal'));
     }
   });
 });
@@ -62,24 +71,24 @@ describe('judgeTiming（見せかたの ラベル）', () => {
   });
 
   it('つよい わざ ほど ぴったりの はば が せまい', () => {
-    expect(zonesFor('strong').perfect).toBeLessThan(zonesFor('normal').perfect);
-    expect(zonesFor('strong').near).toBeLessThan(zonesFor('normal').near);
+    expect(stepsFor('strong')[0]!.until).toBeLessThan(stepsFor('normal')[0]!.until);
+    expect(stepsFor('strong')[1]!.until).toBeLessThan(stepsFor('normal')[1]!.until);
     // ふつうなら ぴったり になる ずれ でも、つよい わざ では ぴったり にならない
     expect(judgeTiming(0.5 + 0.1, 'normal')).toBe('perfect');
     expect(judgeTiming(0.5 + 0.1, 'strong')).not.toBe('perfect');
   });
 
   it('ずれるほど ぴったり → ちかい → はずれ の じゅんに 変わる', () => {
-    const zones = zonesFor('normal');
-    expect(judgeTiming(0.5 + zones.perfect - 0.001, 'normal')).toBe('perfect');
-    expect(judgeTiming(0.5 + zones.perfect + 0.001, 'normal')).toBe('near');
-    expect(judgeTiming(0.5 + zones.near + 0.001, 'normal')).toBe('miss');
+    const steps = stepsFor('normal');
+    expect(judgeTiming(0.5 + steps[0]!.until - 0.001, 'normal')).toBe('perfect');
+    expect(judgeTiming(0.5 + steps[0]!.until + 0.001, 'normal')).toBe('near');
+    expect(judgeTiming(0.5 + steps[1]!.until + 0.001, 'normal')).toBe('miss');
   });
 
   it('あいだに はずれ帯 は ない（ぴったり の となりは かならず ちかい）', () => {
     for (const kind of ['normal', 'strong'] as const) {
-      const zones = zonesFor(kind);
-      expect(judgeTiming(0.5 + zones.perfect + 0.001, kind)).toBe('near');
+      const steps = stepsFor(kind);
+      expect(judgeTiming(0.5 + steps[0]!.until + 0.001, kind)).toBe('near');
     }
   });
 
@@ -90,47 +99,44 @@ describe('judgeTiming（見せかたの ラベル）', () => {
 });
 
 describe('つかれ と メガシンカ で ねらいやすさ が変わる（docs/SPEC.md §3.6・§3.7）', () => {
-  it('つかれていると とがって せまくなる', () => {
-    expect(sigmaFor('normal', { tired: true })).toBeCloseTo(
-      MOVE_CURVE.normal.sigma * TIRED_SIGMA_SCALE,
+  it('つかれていると 段が せまくなる', () => {
+    expect(stepsFor('normal', { tired: true })[0]!.until).toBeCloseTo(
+      MOVE_STEPS.normal[0]!.until * TIRED_STEP_SCALE,
     );
-    expect(zonesFor('normal', { tired: true }).perfect).toBeLessThan(zonesFor('normal').perfect);
   });
 
-  it('メガシンカ中は ひろがって ねらいやすい', () => {
-    expect(sigmaFor('strong', { megaEvolved: true })).toBeCloseTo(
-      MOVE_CURVE.strong.sigma * MEGA_SIGMA_SCALE,
-    );
-    expect(zonesFor('strong', { megaEvolved: true }).perfect).toBeGreaterThan(
-      zonesFor('strong').perfect,
+  it('メガシンカ中は 段が ひろくなる', () => {
+    expect(stepsFor('strong', { megaEvolved: true })[0]!.until).toBeCloseTo(
+      MOVE_STEPS.strong[0]!.until * MEGA_STEP_SCALE,
     );
   });
 
   it('つかれた状態でも メガシンカ中なら 少し取り返せる', () => {
-    const tired = zonesFor('normal', { tired: true });
-    const both = zonesFor('normal', { tired: true, megaEvolved: true });
-    expect(both.perfect).toBeGreaterThan(tired.perfect);
+    const tired = stepsFor('normal', { tired: true })[0]!.until;
+    const both = stepsFor('normal', { tired: true, megaEvolved: true })[0]!.until;
+    expect(both).toBeGreaterThan(tired);
   });
 
   it('おなじ位置でも、つかれていると ぴったり が とれなくなる', () => {
-    const position = 0.5 + zonesFor('normal').perfect - 0.01;
+    const position = 0.5 + MOVE_STEPS.normal[0]!.until - 0.01;
     expect(judgeTiming(position, 'normal')).toBe('perfect');
     expect(judgeTiming(position, 'normal', { tired: true })).not.toBe('perfect');
   });
 
   it('おなじ位置でも、メガシンカ中なら ぴったり になる', () => {
-    const position = 0.5 + zonesFor('strong').perfect + 0.005;
+    const position = 0.5 + MOVE_STEPS.strong[0]!.until + 0.005;
     expect(judgeTiming(position, 'strong')).toBe('near');
     expect(judgeTiming(position, 'strong', { megaEvolved: true })).toBe('perfect');
   });
 
-  it('どの じょうたい でも ぴったり ≦ ちかい ≦ 0ダメージ の じゅんばん', () => {
+  it('どの じょうたい でも 段の さかいめ は 外へ いくほど 大きい', () => {
     for (const kind of ['normal', 'strong'] as const) {
       for (const tired of [false, true]) {
         for (const megaEvolved of [false, true]) {
-          const zones = zonesFor(kind, { tired, megaEvolved });
-          expect(zones.perfect).toBeLessThanOrEqual(zones.near);
-          expect(zones.near).toBeLessThanOrEqual(zones.zero);
+          const steps = stepsFor(kind, { tired, megaEvolved });
+          for (let i = 1; i < steps.length; i += 1) {
+            expect(steps[i]!.until).toBeGreaterThanOrEqual(steps[i - 1]!.until);
+          }
         }
       }
     }
@@ -168,16 +174,19 @@ describe('タイミングのダメージ', () => {
   const weak = makePokemon({ type: 'くさ' }); // ほのお → くさ は ばつぐん
 
   /** ゲージの いち で うつ */
-  const hitAt = (
-    move: 'normal' | 'strong',
-    position: number,
-    a = attacker,
-    t = target,
-  ) => {
+  const hitAt = (move: 'normal' | 'strong', position: number, a = attacker, t = target) => {
     const modifiers = { tired: a.tired, megaEvolved: a.megaEvolved };
-    const ratio = ratioAt(position, move, modifiers);
-    return calcDamage(a, t, { style: 'timing', move, ratio, timing: judgeTiming(position, move, modifiers) }, settings)
-      .damage;
+    return calcDamage(
+      a,
+      t,
+      {
+        style: 'timing',
+        move,
+        power: stepPowerAt(position, move, modifiers),
+        timing: judgeTiming(position, move, modifiers),
+      },
+      settings,
+    ).damage;
   };
 
   it('まんなかで とめると わざの ちから そのまま', () => {
@@ -197,10 +206,8 @@ describe('タイミングのダメージ', () => {
   });
 
   it('ふつうわざ は はずしても 0にならない', () => {
-    const floorDamage = ceilTo10(MOVE_POWER.normal * MOVE_CURVE.normal.floor);
-    expect(hitAt('normal', 0)).toBeGreaterThanOrEqual(floorDamage);
-    // すその ぶん を入れても、floor から 10 以内に おさまる
-    expect(hitAt('normal', 0)).toBeLessThanOrEqual(floorDamage + 10);
+    const outermost = MOVE_STEPS.normal[MOVE_STEPS.normal.length - 1]!.power;
+    expect(hitAt('normal', 0)).toBe(ceilTo10(outermost));
   });
 
   it('つよいわざ を 大きく はずすと 0ダメージ（ばつぐん でも 0）', () => {
@@ -236,7 +243,7 @@ describe('タイミングのダメージ', () => {
       calcDamage(
         attacker,
         target,
-        { style: 'timing', move: 'normal', ratio: 1, timing: 'perfect' },
+        { style: 'timing', move: 'normal', power: MOVE_POWER.normal, timing: 'perfect' },
         makeSettings({ attackStyle: 'timing', battleSpeed: speed }),
       ).damage;
     expect(at('fast')).toBeGreaterThan(at('normal'));

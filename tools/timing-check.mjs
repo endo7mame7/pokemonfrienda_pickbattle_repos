@@ -48,7 +48,8 @@ await page.getByText('バトル スタート').click();
 const seen = { perfect: false, near: false, miss: false, strong: false, normal: false };
 let deadZoneShown = null;  // つよいわざ の 0ダメージ帯（はしの くろい ところ）
 let sawStrongZero = false; // つよいわざ を 大きく はずすと 0ダメージ
-let sliceCount = 0;        // つりがねカーブ の グラデーション
+let stepCount = 0;         // 段の 数
+let numbersShown = 0;      // 段に 書かれた ダメージの 数字
 let rounds = 0;
 let decided = false;
 let shotMove = false;
@@ -88,8 +89,9 @@ for (let i = 0; i < 900; i += 1) {
   if (body.includes('まんなかで とめよう')) {
     // つよいわざ のときだけ、はしに 0ダメージ帯 が 見えているはず
     const isStrong = await page.locator('.gauge__warn').count();
-    const dead = await page.locator('.gauge__dead').count();
-    sliceCount = await page.locator('.gauge__curve').count();
+    const dead = await page.locator('.gauge__step--zero').count();
+    stepCount = await page.locator('.gauge__step').count();
+    numbersShown = await page.locator('.gauge__num').count();
     if (isStrong) { deadZoneShown = dead; if (!shotGauge) { await shot('31-gauge-strong'); shotGauge = true; } }
     else {
       if (dead !== 0) errors.push('ふつうわざ に 0ダメージ帯 が出ている');
@@ -117,7 +119,7 @@ const overflow = await page.evaluate(() => ({
   y: document.documentElement.scrollHeight - document.documentElement.clientHeight,
 }));
 
-const summary = { size: SIZE, decided, waza: rounds, seen, deadZoneShown, sliceCount, sawStrongZero, overflow, errors };
+const summary = { size: SIZE, decided, waza: rounds, seen, deadZoneShown, stepCount, numbersShown, sawStrongZero, overflow, errors };
 console.log(JSON.stringify(summary, null, 2));
 await browser.close();
 
@@ -125,8 +127,9 @@ const ok =
   decided &&
   seen.normal && seen.strong &&
   (seen.perfect || seen.near || seen.miss) &&
-  deadZoneShown === 2 &&  // つよいわざ の ゲージの りょうはし に 0ダメージ帯 が出ている
-  sliceCount > 0 &&       // つりがねカーブ が バーの色で 見えている
+  deadZoneShown === 1 &&  // つよいわざ の いちばん外の段 が 0ダメージ帯
+  stepCount === 4 &&      // 段が 4つ ある
+  numbersShown >= 3 &&    // 段に ダメージの 数字が 書いてある
   overflow.x === 0 && overflow.y === 0 &&
   errors.length === 0;
 

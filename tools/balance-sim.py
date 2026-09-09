@@ -135,13 +135,10 @@ def _stats(**kwargs):
 
 
 # ── タイミング方式（docs/SPEC.md §3.4）
-MOVE_POWER = {'normal': 200, 'strong': 290}   # まんなかで とめたときの ちから
 SPEED_SCALE = {'fast': 1.4, 'normal': 1.0, 'slow': 0.7}
-# あたりかたの カーブ（docs/SPEC.md §3.4.1）。
-# sigma が小さいほど とがっていて むずかしい。floor は はずしても入る ぶん。
-# floor が 0 の わざ は、すそ を cut で切って きっちり 0 にする。
-CURVE = {'normal': {'sigma': 0.22, 'floor': 0.22, 'cut': 0.0},
-         'strong': {'sigma': 0.10, 'floor': 0.0, 'cut': 0.15}}
+# あたりかたの 段（docs/SPEC.md §3.4.1）。(まんなかからの ずれ の 上かぎり, ちから)
+STEPS = {'normal': [(0.14, 200), (0.28, 150), (0.40, 100), (0.50, 60)],
+         'strong': [(0.06, 290), (0.13, 200), (0.21, 100), (0.50, 0)]}
 # ゲージの サイクル の ばいすう。小さいほど はやく、ねらいにくい
 MOVE_GAUGE = {'normal': 1.0, 'strong': 0.7}
 # 園児の うでまえ の想定（ぴったり / ちかい の確率）
@@ -150,26 +147,26 @@ SKILL = {'園児': 0.0, '大人': 0.45}
 
 
 # ねらう はば の ばいすう（docs/SPEC.md §3.6・§3.7）
-TIRED_SIGMA = 0.6
-MEGA_SIGMA = 1.4
+TIRED_STEP = 0.6
+MEGA_STEP = 1.4
 
 
-def timing_ratio(move, tired, mega, skill):
-    """ゲージを止めた結果の「ちからの わりあい（0〜1）」。
+def timing_power(move, tired, mega, skill):
+    """ゲージを止めた段の「ちから」。
 
     うでまえ は「まんなかを どれくらい ねらえるか」で表す。
     園児は ほぼ でたらめ に止める。うまい人ほど まんなか に寄る。
     つよいわざ は ゲージが はやいので、おなじ うでまえ でも ずれ が大きくなる。
     """
-    c = CURVE[move]
-    sigma = c['sigma'] * (TIRED_SIGMA if tired else 1) * (MEGA_SIGMA if mega else 1)
+    scale = (TIRED_STEP if tired else 1) * (MEGA_STEP if mega else 1)
     bias = skill  # 0 = でたらめ、大きいほど まんなかに寄る
-    distance = abs(random.random() - 0.5) * (1 - bias) / MOVE_GAUGE[move]
-    distance = min(0.5, distance)
-    bell = math.exp(-((distance / sigma) ** 2) / 2)
-    if c['floor'] > 0:
-        return c['floor'] + (1 - c['floor']) * bell
-    return max(0.0, (bell - c['cut']) / (1 - c['cut']))
+    distance = min(0.5, abs(random.random() - 0.5) * (1 - bias) / MOVE_GAUGE[move])
+    steps = STEPS[move]
+    for i, (until, power) in enumerate(steps):
+        edge = 0.5 if i == len(steps) - 1 else min(0.5, until * scale)
+        if distance <= edge:
+            return power
+    return steps[-1][1]
 
 
 def timing_battle(size, speed='normal', skill=SKILL['園児'], strong_rate=0.45,
@@ -191,9 +188,9 @@ def timing_battle(size, speed='normal', skill=SKILL['園児'], strong_rate=0.45,
 
         move = 'strong' if random.random() < strong_rate else 'normal'
         was_tired = fatigue and attacker['tired']
-        ratio = timing_ratio(move, was_tired, attacker['mega'], skill)
+        power = timing_power(move, was_tired, attacker['mega'], skill)
 
-        damage = MOVE_POWER[move] * SPEED_SCALE[speed] * ratio
+        damage = power * SPEED_SCALE[speed]
         if attacker['mega']:
             damage *= 1.5
         if damage > 0 and target['type'] in CHART[attacker['type']]:
@@ -238,7 +235,7 @@ def main():
                   f"約{mean * SECONDS_PER_TURN / 60:4.1f}分")
         print()
 
-    print("■ タイミング方式（既定）— つりがねカーブ ふつうσ0.22 / つよいσ0.10")
+    print("■ タイミング方式（既定）— 段 ふつう200/150/100/60 / つよい290/200/100/0")
     for label, skill in SKILL.items():
         for speed in ('fast', 'normal', 'slow'):
             row = f"  {label} {speed:<7}: "

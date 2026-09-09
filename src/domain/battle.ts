@@ -2,7 +2,7 @@ import { calcDamage } from './damage';
 import type { AttackInput } from './damage';
 import { moveName } from './moves';
 import type { MoveKind } from './moves';
-import { judgeRatio, ratioAt } from './timing';
+import { judgeStep, stepIndexAt, stepPowerAt } from './timing';
 import type { TimingResult } from './timing';
 import { diceCountFor } from './dice';
 import { clearFatigueIfAlone, updateFatigue } from './fatigue';
@@ -300,16 +300,16 @@ export function battleReducer(state: BattleState, action: BattleAction): BattleS
           ? undefined
           : state.teams[state.turnPlayer][state.selectedAttackerIndex];
       if (!attacker) return state;
-      // まんなかに 近いほど 大きい わりあい。ラベルは そこから決める
-      const ratio = ratioAt(action.position, state.selectedMove, {
+      // どの段で とまったか。ちから も ラベル も そこから決まる
+      const modifiers = {
         tired: state.settings.fatigueEnabled && attacker.tired,
         megaEvolved: attacker.megaEvolved,
-      });
+      };
       return resolveAttack(state, {
         style: 'timing',
         move: state.selectedMove,
-        ratio,
-        timing: judgeRatio(ratio),
+        power: stepPowerAt(action.position, state.selectedMove, modifiers),
+        timing: judgeStep(stepIndexAt(action.position, state.selectedMove, modifiers)),
       });
     }
 

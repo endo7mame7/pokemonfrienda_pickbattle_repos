@@ -291,6 +291,7 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
               tired={settings.fatigueEnabled && attackerPokemon.tired}
               megaEvolved={attackerPokemon.megaEvolved}
               gaugeSpeed={settings.gaugeSpeed}
+              battleSpeed={settings.battleSpeed}
               onStop={(position) => dispatch({ type: 'stopTiming', position })}
             />
           )}
