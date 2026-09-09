@@ -1,7 +1,6 @@
 import { movePower } from './moves';
 import type { TimingMoveKind } from './moves';
 import { mashMultiplier } from './mash';
-import { timingMultiplier } from './timing';
 import type { TimingResult } from './timing';
 import { isSuperEffective } from './typeChart';
 import type { BattlePokemon, Settings } from './types';
@@ -24,7 +23,8 @@ export interface DamageResult {
 /** サイコロの出目か、わざ＋タイミングか。どちらで攻撃したか */
 export type AttackInput =
   | { style: 'dice'; rolls: number[] }
-  | { style: 'timing'; move: TimingMoveKind; timing: TimingResult }
+  /** ratio は ちから の わりあい（0〜1）。timing は 見せかたの ラベル */
+  | { style: 'timing'; move: TimingMoveKind; ratio: number; timing: TimingResult }
   /** メガわざ。fill は ゲージの たまりぐあい（0〜1） */
   | { style: 'mash'; fill: number };
 
@@ -49,15 +49,12 @@ export function calcDamage(
   if (input.style === 'dice') {
     damage = input.rolls.reduce((sum, roll) => sum + roll, 0) * settings.damageMultiplier;
   } else if (input.style === 'timing') {
-    damage =
-      movePower(input.move, settings.battleSpeed) *
-      timingMultiplier(input.move, input.timing) *
-      megaBoost;
+    damage = movePower(input.move, settings.battleSpeed) * input.ratio * megaBoost;
   } else {
     damage = movePower('mega', settings.battleSpeed) * mashMultiplier(input.fill) * megaBoost;
   }
 
-  // つよいわざ を はずすと まるごと 0。ばつぐん ボーナスも のらない
+  // つよいわざ を 大きく はずすと まるごと 0。ばつぐん ボーナスも のらない
   // （「はずれ なのに ばつぐん +20」に ならないように）
   if (damage === 0) {
     return { damage: 0, isSuperEffective: false, isTired: tired };

@@ -59,7 +59,7 @@ describe('メガわざ の 名前と ダメージ', () => {
     const strongPerfect = calcDamage(
       mega,
       target,
-      { style: 'timing', move: 'strong', timing: 'perfect' },
+      { style: 'timing', move: 'strong', ratio: 1, timing: 'perfect' },
       settings,
     ).damage;
     expect(megaHit(1)).toBeLessThan(strongPerfect);

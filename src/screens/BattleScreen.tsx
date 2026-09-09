@@ -255,7 +255,7 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
                   >
                     {MOVE_NAMES[attackerPokemon.type][move]}
                     <span className="move-btn__sub">
-                      {move === 'normal' ? 'あてやすい' : 'つよい！ はずすと 0'}
+                      {move === 'normal' ? 'あてやすい' : 'つよい！ ゲージも はやい'}
                     </span>
                   </button>
                 ))}
@@ -290,6 +290,7 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
               type={attackerPokemon.type}
               tired={settings.fatigueEnabled && attackerPokemon.tired}
               megaEvolved={attackerPokemon.megaEvolved}
+              gaugeSpeed={settings.gaugeSpeed}
               onStop={(position) => dispatch({ type: 'stopTiming', position })}
             />
           )}
@@ -322,10 +323,10 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
               )}
               {result.timing && (
                 <div className={`timing-result timing-result--${result.timing}`}>
-                  {result.timing === 'perfect' && '🎯 ぴったり！ 2ばい'}
+                  {result.timing === 'perfect' && '🎯 ぴったり！'}
                   {result.timing === 'near' && '⭕ ちかい！'}
                   {result.timing === 'miss' &&
-                    (result.moveKind === 'strong' ? '💦 はずれ… 0ダメージ' : '💦 はずれ… はんぶん')}
+                    (result.damage === 0 ? '💦 はずれ… 0ダメージ' : '💦 かすった…')}
                 </div>
               )}
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center' }}>

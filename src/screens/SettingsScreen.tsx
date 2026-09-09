@@ -1,5 +1,12 @@
 import { SPEED_DICE_MULTIPLIER } from '../domain';
-import type { AttackStyle, BattleSpeed, MegaThreshold, Settings, SuperEffectiveBonus } from '../domain';
+import type {
+  AttackStyle,
+  BattleSpeed,
+  GaugeSpeed,
+  MegaThreshold,
+  Settings,
+  SuperEffectiveBonus,
+} from '../domain';
 
 interface Props {
   settings: Settings;
@@ -16,6 +23,13 @@ const SPEEDS: Array<{ value: BattleSpeed; label: string; hint: string }> = [
   { value: 'fast', label: 'さくさく', hint: 'みじかい' },
   { value: 'normal', label: 'ふつう', hint: 'おすすめ' },
   { value: 'slow', label: 'じっくり', hint: 'ながい' },
+];
+
+/** ゲージが うごく はやさ。つよいわざ は これより さらに はやい（§3.4） */
+const GAUGE_SPEEDS: Array<{ value: GaugeSpeed; label: string; hint: string }> = [
+  { value: 'slow', label: 'ゆっくり', hint: 'ねらいやすい' },
+  { value: 'normal', label: 'ふつう', hint: 'おすすめ' },
+  { value: 'fast', label: 'はやめ', hint: 'むずかしい' },
 ];
 
 const MEGA: Array<{ value: MegaThreshold; label: string }> = [
@@ -70,6 +84,26 @@ export function SettingsScreen({ settings, onChange, onBack }: Props) {
             ))}
           </div>
         </div>
+
+        {settings.attackStyle === 'timing' && (
+          <div className="field" data-setting="gaugeSpeed">
+            <div className="field__label">ゲージの はやさ</div>
+            <div className="chip-row">
+              {GAUGE_SPEEDS.map(({ value, label, hint }) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={value === settings.gaugeSpeed ? 'chip chip--on' : 'chip'}
+                  onClick={() => update({ gaugeSpeed: value })}
+                >
+                  {label}
+                  <span className="move-btn__sub">{hint}</span>
+                </button>
+              ))}
+            </div>
+            <p className="field__note">つよいわざ は これより さらに はやく うごくよ</p>
+          </div>
+        )}
 
         <div className="field">
           <div className="field__label">メガシンカ する たいりょく</div>
@@ -129,6 +163,7 @@ export function SettingsScreen({ settings, onChange, onBack }: Props) {
                 ...settings,
                 attackStyle: 'timing',
                 battleSpeed: 'normal',
+                gaugeSpeed: 'normal',
                 damageMultiplier: 20,
                 megaThreshold: 'third',
                 superEffectiveBonus: 20,

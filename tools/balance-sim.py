@@ -16,6 +16,7 @@ docs/SPEC.md 「5. バランス検証」の数値を出すために使う。
 
     python3 tools/balance-sim.py
 """
+import math
 import random
 import statistics
 
@@ -134,46 +135,41 @@ def _stats(**kwargs):
 
 
 # ── タイミング方式（docs/SPEC.md §3.4）
-MOVE_POWER = {'normal': 110, 'strong': 220}
+MOVE_POWER = {'normal': 200, 'strong': 290}   # まんなかで とめたときの ちから
 SPEED_SCALE = {'fast': 1.4, 'normal': 1.0, 'slow': 0.7}
-TIMING_MULT = {'perfect': 2.0, 'near': 1.0, 'miss': 0.5}
-# はずした ときの ばいりつ。つよいわざ だけ 0（docs/SPEC.md §3.4）
-MISS_MULT = {'normal': 0.5, 'strong': 0.0}
+# あたりかたの カーブ（docs/SPEC.md §3.4.1）。
+# sigma が小さいほど とがっていて むずかしい。floor は はずしても入る ぶん。
+# floor が 0 の わざ は、すそ を cut で切って きっちり 0 にする。
+CURVE = {'normal': {'sigma': 0.22, 'floor': 0.22, 'cut': 0.0},
+         'strong': {'sigma': 0.10, 'floor': 0.0, 'cut': 0.15}}
+# ゲージの サイクル の ばいすう。小さいほど はやく、ねらいにくい
+MOVE_GAUGE = {'normal': 1.0, 'strong': 0.7}
 # 園児の うでまえ の想定（ぴったり / ちかい の確率）
 # まんなかに どれくらい 寄せられるか（0 = でたらめ、1 = かならず まんなか）
 SKILL = {'園児': 0.0, '大人': 0.45}
 
 
 # ねらう はば の ばいすう（docs/SPEC.md §3.6・§3.7）
-TIRED_ZONE = {'perfect': 0.5, 'gap_width': 1.4, 'near': 0.7}
-MEGA_ZONE = {'perfect': 1.5, 'gap_width': 0.7, 'near': 1.2}
-# gap_width は ぴったり の すぐ そとに おく「あいだの はずれ」の はば
-BASE_ZONE = {'normal': {'perfect': 0.12, 'gap_width': 0.0, 'near': 0.32},
-             'strong': {'perfect': 0.06, 'gap_width': 0.06, 'near': 0.26}}
+TIRED_SIGMA = 0.6
+MEGA_SIGMA = 1.4
 
 
-def timing_result(move, tired, mega, skill):
-    """ゲージを止めた結果。うでまえ は「まんなかを どれくらい ねらえるか」で表す。
+def timing_ratio(move, tired, mega, skill):
+    """ゲージを止めた結果の「ちからの わりあい（0〜1）」。
 
-    園児は ほぼ でたらめ に止めるので、成功率は ゾーンの ひろさ に比例する。
-    うまい人ほど まんなか に寄るので、その ぶん を skill_bias で足す。
+    うでまえ は「まんなかを どれくらい ねらえるか」で表す。
+    園児は ほぼ でたらめ に止める。うまい人ほど まんなか に寄る。
+    つよいわざ は ゲージが はやいので、おなじ うでまえ でも ずれ が大きくなる。
     """
-    zone = BASE_ZONE[move]
-    def scaled(key):
-        return zone[key] * (TIRED_ZONE[key] if tired else 1) * (MEGA_ZONE[key] if mega else 1)
-    perfect = scaled('perfect')
-    gap = perfect + scaled('gap_width')     # ここまでが「あいだの はずれ」
-    near = max(scaled('near'), gap)
+    c = CURVE[move]
+    sigma = c['sigma'] * (TIRED_SIGMA if tired else 1) * (MEGA_SIGMA if mega else 1)
     bias = skill  # 0 = でたらめ、大きいほど まんなかに寄る
-    # まんなかからの ずれ。bias が大きいほど 0 に近くなる
-    distance = abs(random.random() - 0.5) * (1 - bias)
-    if distance <= perfect:
-        return 'perfect'
-    if distance <= gap:
-        return 'miss'   # あいだの はずれ
-    if distance <= near:
-        return 'near'
-    return 'miss'       # そとの はずれ
+    distance = abs(random.random() - 0.5) * (1 - bias) / MOVE_GAUGE[move]
+    distance = min(0.5, distance)
+    bell = math.exp(-((distance / sigma) ** 2) / 2)
+    if c['floor'] > 0:
+        return c['floor'] + (1 - c['floor']) * bell
+    return max(0.0, (bell - c['cut']) / (1 - c['cut']))
 
 
 def timing_battle(size, speed='normal', skill=SKILL['園児'], strong_rate=0.45,
@@ -195,10 +191,9 @@ def timing_battle(size, speed='normal', skill=SKILL['園児'], strong_rate=0.45,
 
         move = 'strong' if random.random() < strong_rate else 'normal'
         was_tired = fatigue and attacker['tired']
-        result = timing_result(move, was_tired, attacker['mega'], skill)
+        ratio = timing_ratio(move, was_tired, attacker['mega'], skill)
 
-        mult = MISS_MULT[move] if result == 'miss' else TIMING_MULT[result]
-        damage = MOVE_POWER[move] * SPEED_SCALE[speed] * mult
+        damage = MOVE_POWER[move] * SPEED_SCALE[speed] * ratio
         if attacker['mega']:
             damage *= 1.5
         if damage > 0 and target['type'] in CHART[attacker['type']]:
@@ -243,7 +238,7 @@ def main():
                   f"約{mean * SECONDS_PER_TURN / 60:4.1f}分")
         print()
 
-    print("■ タイミング方式（既定）— わざ ふつう110 / つよい220（はずすと 0）")
+    print("■ タイミング方式（既定）— つりがねカーブ ふつうσ0.22 / つよいσ0.10")
     for label, skill in SKILL.items():
         for speed in ('fast', 'normal', 'slow'):
             row = f"  {label} {speed:<7}: "

@@ -46,12 +46,14 @@ await page.waitForTimeout(1500);
 await page.getByText('バトル スタート').click();
 
 const seen = { perfect: false, near: false, miss: false, strong: false, normal: false };
-let gapZoneShown = null;   // つよいわざ の「あいだの はずれ」帯が 出ているか
-let sawStrongZero = false; // つよいわざ を はずすと 0ダメージ
+let deadZoneShown = null;  // つよいわざ の 0ダメージ帯（はしの くろい ところ）
+let sawStrongZero = false; // つよいわざ を 大きく はずすと 0ダメージ
+let sliceCount = 0;        // つりがねカーブ の グラデーション
 let rounds = 0;
 let decided = false;
 let shotMove = false;
 let shotGauge = false;
+let shotGaugeNormal = false;
 let shotResult = false;
 
 for (let i = 0; i < 900; i += 1) {
@@ -84,11 +86,15 @@ for (let i = 0; i < 900; i += 1) {
     continue;
   }
   if (body.includes('まんなかで とめよう')) {
-    // つよいわざ のときだけ「あいだの はずれ」帯が 見えているはず
+    // つよいわざ のときだけ、はしに 0ダメージ帯 が 見えているはず
     const isStrong = await page.locator('.gauge__warn').count();
-    const gaps = await page.locator('.gauge__zone--gap').count();
-    if (isStrong) { gapZoneShown = gaps; if (!shotGauge) { await shot('31-gauge-strong'); shotGauge = true; } }
-    else if (gaps !== 0) { errors.push('ふつうわざ に あいだの はずれ帯 が出ている'); }
+    const dead = await page.locator('.gauge__dead').count();
+    sliceCount = await page.locator('.gauge__curve').count();
+    if (isStrong) { deadZoneShown = dead; if (!shotGauge) { await shot('31-gauge-strong'); shotGauge = true; } }
+    else {
+      if (dead !== 0) errors.push('ふつうわざ に 0ダメージ帯 が出ている');
+      if (!shotGaugeNormal) { await shot('31-gauge-normal'); shotGaugeNormal = true; }
+    }
     await page.locator('.gauge').click({ force: true });
     await page.waitForTimeout(2400); // カットイン + 飛んで 当たる まで
     continue;
@@ -111,7 +117,7 @@ const overflow = await page.evaluate(() => ({
   y: document.documentElement.scrollHeight - document.documentElement.clientHeight,
 }));
 
-const summary = { size: SIZE, decided, waza: rounds, seen, gapZoneShown, sawStrongZero, overflow, errors };
+const summary = { size: SIZE, decided, waza: rounds, seen, deadZoneShown, sliceCount, sawStrongZero, overflow, errors };
 console.log(JSON.stringify(summary, null, 2));
 await browser.close();
 
@@ -119,7 +125,8 @@ const ok =
   decided &&
   seen.normal && seen.strong &&
   (seen.perfect || seen.near || seen.miss) &&
-  gapZoneShown === 1 &&   // つよいわざ の ゲージに あいだの はずれ帯 が出ている
+  deadZoneShown === 2 &&  // つよいわざ の ゲージの りょうはし に 0ダメージ帯 が出ている
+  sliceCount > 0 &&       // つりがねカーブ が バーの色で 見えている
   overflow.x === 0 && overflow.y === 0 &&
   errors.length === 0;
 
