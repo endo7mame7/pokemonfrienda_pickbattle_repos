@@ -15,6 +15,10 @@ export type BattlePhase =
   | 'megaPrompt'
   /** メガシンカ の演出中 */
   | 'megaEvolving'
+  /** テラスタル できる。だれを テラスタル させるか えらぶ */
+  | 'teraPrompt'
+  /** テラスタル の演出中 */
+  | 'teraChanging'
   | 'selectAttacker'
   | 'selectTarget'
   /** どの わざ を つかう？（タイミングのとき） */
@@ -29,6 +33,15 @@ export type BattlePhase =
   | 'resolve'
   | 'handOff'
   | 'finished';
+
+/** こうげきが 1体に あたった 結果 */
+export interface Hit {
+  targetIndex: number;
+  targetName: string;
+  damage: number;
+  isSuperEffective: boolean;
+  fainted: boolean;
+}
 
 /** 1回の攻撃の結果。演出と読み上げに使う */
 export interface TurnResult {
@@ -48,12 +61,18 @@ export interface TurnResult {
   timing?: TimingResult;
   /** メガわざのときだけ。ゲージの たまりぐあい（0〜1） */
   mashFill?: number;
+  /** えらんだ あいて に あたえた ダメージ。テラスタルわざ では 1体ぶん */
   damage: number;
   isSuperEffective: boolean;
   isTired: boolean;
   targetFainted: boolean;
   /** メガわざ を つかって、メガシンカ が とけたか */
   megaEnded: boolean;
+  /**
+   * あたった あいて ぜんぶ。ふつうの わざ は 1体だけ、
+   * テラスタルわざ は いきている あいて ぜんいん（§3.11）。
+   */
+  hits: Hit[];
 }
 
 export interface BattleState {
@@ -67,6 +86,10 @@ export interface BattleState {
   selectedMove: MoveKind | null;
   /** メガシンカ できる自分のポケモン。いなければ null */
   megaCandidateIndex: number | null;
+  /** いま「だれを テラスタル する？」と 聞いているか（§3.11） */
+  teraOffer: boolean;
+  /** テラスタル は チームに 1回だけ。つかったら true */
+  teraUsed: Record<PlayerId, boolean>;
   lastResult: TurnResult | null;
   winner: PlayerId | null;
   settings: Settings;
@@ -77,6 +100,10 @@ export type BattleAction =
   | { type: 'megaEvolve' }
   /** いまは メガシンカ しない。このターンは もう聞かない */
   | { type: 'declineMega' }
+  /** その子を テラスタル させる */
+  | { type: 'terastallize'; index: number }
+  /** いまは テラスタル しない。このターンは もう聞かない */
+  | { type: 'declineTera' }
   | { type: 'selectAttacker'; index: number }
   | { type: 'selectTarget'; index: number }
   /** 選択をやり直す。サイコロを振るまではいつでも戻れる */
@@ -102,6 +129,7 @@ export function toBattlePokemon(pick: Pick): BattlePokemon {
     ...(pick.silhouette ? { silhouette: pick.silhouette } : {}),
     megaEvolved: false,
     megaUsed: false,
+    terastallized: false,
     tired: false,
     damageDealt: 0,
   };
@@ -113,15 +141,19 @@ export function createBattle(
   firstPlayer: PlayerId,
   settings: Settings,
 ): BattleState {
+  // 1ターン目からも テラスタル を えらべるようにする（§3.11）
+  const teraOffer = settings.attackStyle === 'timing';
   return {
     teams: { p1: p1.map(toBattlePokemon), p2: p2.map(toBattlePokemon) },
     turnPlayer: firstPlayer,
     turnCount: 1,
-    phase: 'selectAttacker',
+    phase: teraOffer ? 'teraPrompt' : 'selectAttacker',
     selectedAttackerIndex: null,
     selectedTargetIndex: null,
     selectedMove: null,
     megaCandidateIndex: null,
+    teraOffer,
+    teraUsed: { p1: false, p2: false },
     lastResult: null,
     winner: null,
     settings,
@@ -167,12 +199,36 @@ function resolveAttack(state: BattleState, input: AttackInput): BattleState {
   if (attackerIndex === null || targetIndex === null) return state;
 
   const attacker = state.teams[state.turnPlayer][attackerIndex];
-  const target = state.teams[OPPONENT_OF[state.turnPlayer]][targetIndex];
+  const defenders = state.teams[OPPONENT_OF[state.turnPlayer]];
+  const target = defenders[targetIndex];
   if (!attacker || !target) return state;
 
-  const { damage, isSuperEffective, isTired } = calcDamage(attacker, target, input, state.settings);
   const kind: MoveKind =
     input.style === 'timing' ? input.move : input.style === 'mash' ? 'mega' : 'normal';
+
+  // テラスタルわざ は いきている あいて ぜんいん に あたる。ちからは 等分（§3.11）
+  const spread = kind === 'tera';
+  const hitIndexes = spread
+    ? defenders.map((_, index) => index).filter((index) => isAlive(defenders[index]!))
+    : [targetIndex];
+  /**
+   * テラスタルわざ の わりざん。あいての 人数で 等分する（§3.11）。
+   * ただし あいてが 1体のときは まるごと 450 が 当たって
+   * つよいわざ（300）より 強くなってしまうので、1.5 で わる ところで 止める。
+   * こうすると「ちらすより 1体に あつめたほうが 大きい」が いつでも なりたつ。
+   */
+  const share = spread && hitIndexes.length > 0 ? Math.max(hitIndexes.length, 1.5) : 1;
+  const shared: AttackInput =
+    input.style === 'timing' ? { ...input, power: input.power / share } : input;
+
+  const hits: Hit[] = hitIndexes.flatMap((index) => {
+    const defender = defenders[index];
+    if (!defender) return [];
+    const { damage, isSuperEffective } = calcDamage(attacker, defender, shared, state.settings);
+    return [{ targetIndex: index, targetName: defender.name, damage, isSuperEffective, fainted: false }];
+  });
+  const main = hits.find((hit) => hit.targetIndex === targetIndex) ?? hits[0];
+  const { isTired } = calcDamage(attacker, target, shared, state.settings);
 
   return {
     ...state,
@@ -187,11 +243,12 @@ function resolveAttack(state: BattleState, input: AttackInput): BattleState {
       ...(input.style === 'dice' ? { rolls: input.rolls } : {}),
       ...(input.style === 'timing' ? { timing: input.timing } : {}),
       ...(input.style === 'mash' ? { mashFill: input.fill } : {}),
-      damage,
-      isSuperEffective,
+      damage: main?.damage ?? 0,
+      isSuperEffective: main?.isSuperEffective ?? false,
       isTired,
       targetFainted: false,
       megaEnded: false,
+      hits,
     },
   };
 }
@@ -203,12 +260,20 @@ function startTurn(state: BattleState, turnPlayer: PlayerId): BattleState {
   if (state.settings.fatigueEnabled) clearFatigueIfAlone(teams[turnPlayer]);
 
   const megaCandidateIndex = findMegaCandidateIndex(teams[turnPlayer], state.settings);
+  // テラスタル は チームに 1回だけ。まだ つかっていなければ 毎ターン 聞く（§3.11）
+  const teraOffer =
+    !state.teraUsed[turnPlayer] &&
+    state.settings.attackStyle === 'timing' &&
+    teams[turnPlayer].some(isAlive);
+
   return {
     ...state,
     teams,
     turnPlayer,
-    phase: megaCandidateIndex === null ? 'selectAttacker' : 'megaPrompt',
+    phase:
+      megaCandidateIndex !== null ? 'megaPrompt' : teraOffer ? 'teraPrompt' : 'selectAttacker',
     megaCandidateIndex,
+    teraOffer,
     selectedAttackerIndex: null,
     selectedTargetIndex: null,
     selectedMove: null,
@@ -228,8 +293,34 @@ export function battleReducer(state: BattleState, action: BattleAction): BattleS
 
     case 'declineMega': {
       if (state.phase !== 'megaPrompt') return state;
+      // 断ったら、このターンはもう聞かない（次のターンにまた聞く）。
+      // つづけて テラスタル を 聞く
+      return {
+        ...state,
+        phase: state.teraOffer ? 'teraPrompt' : 'selectAttacker',
+        megaCandidateIndex: null,
+      };
+    }
+
+    case 'terastallize': {
+      if (state.phase !== 'teraPrompt' || state.teraUsed[state.turnPlayer]) return state;
+      const teams = cloneTeams(state.teams);
+      const pokemon = teams[state.turnPlayer][action.index];
+      if (!pokemon || !isAlive(pokemon)) return state;
+      pokemon.terastallized = true;
+      return {
+        ...state,
+        teams,
+        phase: 'teraChanging',
+        teraOffer: false,
+        teraUsed: { ...state.teraUsed, [state.turnPlayer]: true },
+      };
+    }
+
+    case 'declineTera': {
+      if (state.phase !== 'teraPrompt') return state;
       // 断ったら、このターンはもう聞かない（次のターンにまた聞く）
-      return { ...state, phase: 'selectAttacker', megaCandidateIndex: null };
+      return { ...state, phase: 'selectAttacker', teraOffer: false };
     }
 
     case 'selectAttacker': {
@@ -277,8 +368,9 @@ export function battleReducer(state: BattleState, action: BattleAction): BattleS
         state.selectedAttackerIndex === null
           ? undefined
           : state.teams[state.turnPlayer][state.selectedAttackerIndex];
-      // メガわざは メガシンカ中の子だけ
+      // メガわざは メガシンカ中の子だけ、テラスタルわざ は テラスタル中の子だけ
       if (action.move === 'mega' && !attacker?.megaEvolved) return state;
+      if (action.move === 'tera' && !attacker?.terastallized) return state;
       return {
         ...state,
         phase: action.move === 'mega' ? 'mashing' : 'timing',
@@ -328,11 +420,18 @@ export function battleReducer(state: BattleState, action: BattleAction): BattleS
         const teams = cloneTeams(state.teams);
         const attackerTeam = teams[state.turnPlayer];
         const attacker = attackerTeam[attackerIndex];
-        const target = teams[OPPONENT_OF[state.turnPlayer]][result.targetIndex];
+        const defenders = teams[OPPONENT_OF[state.turnPlayer]];
+        const target = defenders[result.targetIndex];
         if (!attacker || !target) return state;
 
-        target.hp = Math.max(0, target.hp - result.damage);
-        attacker.damageDealt += result.damage;
+        // テラスタルわざ は 1回で 何体にも あたる
+        const hits = result.hits.map((hit) => {
+          const defender = defenders[hit.targetIndex];
+          if (!defender) return hit;
+          defender.hp = Math.max(0, defender.hp - hit.damage);
+          attacker.damageDealt += hit.damage;
+          return { ...hit, fainted: defender.hp === 0 };
+        });
 
         // メガわざ は ちからを つかいきる わざ。うつと メガシンカ が とけて、
         // もう一度は メガシンカ できない（docs/SPEC.md §3.6）
@@ -351,7 +450,7 @@ export function battleReducer(state: BattleState, action: BattleAction): BattleS
           ...state,
           teams,
           phase: 'resolve',
-          lastResult: { ...result, targetFainted: target.hp === 0, megaEnded },
+          lastResult: { ...result, hits, targetFainted: target.hp === 0, megaEnded },
         };
       }
 
@@ -366,6 +465,12 @@ export function battleReducer(state: BattleState, action: BattleAction): BattleS
       // メガシンカの演出が終わった。ほかにもできる子がいれば続けて聞く
       if (state.phase === 'megaEvolving') {
         return startTurn(state, state.turnPlayer);
+      }
+
+      // テラスタルの演出が終わった。だれで こうげきするか えらぶ
+      // （テラスタルした子でなくてもよい。つかれの かくにん も とばさない）
+      if (state.phase === 'teraChanging') {
+        return { ...state, phase: 'selectAttacker' };
       }
 
       if (state.phase === 'handOff') {

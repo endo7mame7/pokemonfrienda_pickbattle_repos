@@ -28,6 +28,11 @@ interface Props {
   moveName: string;
   moveKind: MoveKind;
   damage: number;
+  /**
+   * ダメージの数を出す ばしょ。テラスタルわざ は あいて ぜんいん に あたるので
+   * 何人ぶんも 出す（§3.11）。わたされなければ path の ところに 1つだけ。
+   */
+  damageHits?: Array<{ path: AttackPath; damage: number }> | undefined;
   isSuperEffective: boolean;
   /**
    * cutIn = わざの なまえ を大きく見せる／strike = 飛んで当たる／
@@ -42,7 +47,7 @@ interface Props {
  * メガわざ のときは 専用の はでな エフェクトになる。
  */
 export function AttackAnimation({
-  path, attacker, moveName, moveKind, damage, isSuperEffective, stage,
+  path, attacker, moveName, moveKind, damage, damageHits, isSuperEffective, stage,
 }: Props) {
   const { particle, center } = TYPE_EFFECTS[attacker.type];
   const isMega = moveKind === 'mega';
@@ -81,7 +86,14 @@ export function AttackAnimation({
   }
 
   if (stage === 'damage') {
-    return <DamagePop damage={damage} path={path} style={style} />;
+    const pops = damageHits ?? [{ path, damage }];
+    return (
+      <>
+        {pops.map((pop, index) => (
+          <DamagePop key={index} damage={pop.damage} path={pop.path} style={style} />
+        ))}
+      </>
+    );
   }
 
   return (

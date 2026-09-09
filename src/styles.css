@@ -241,6 +241,12 @@ body {
   background: linear-gradient(140deg, #fff, #ffe9fb);
 }
 
+/* テラスタル中。けっしょう っぽい 水色〜白 の かがやき（§3.11） */
+.card--tera {
+  border-color: #2bb8d8;
+  background: linear-gradient(140deg, #fff, #e2f8ff 60%, #f2eaff);
+}
+
 @keyframes bob {
   0%,
   100% {
@@ -298,7 +304,10 @@ body {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 0;
+  /* わざが 4つ（ふつう・つよい・テラスタル・メガ）ならんでも
+     「えらびなおす」まで おさまる 高さ を かならず とる。
+     1vs1 は カードが 大きいので、ここを 取らないと はみ出す */
+  min-height: 236px;
   overflow: hidden;
 }
 
@@ -904,6 +913,165 @@ body {
 }
 
 
+
+/* --- テラスタル の カットイン（docs/SPEC.md §3.11） --- */
+.tera-cutin {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* うえから ふってくる けっしょう */
+.tera-cutin__rain {
+  position: absolute;
+  inset: 0;
+}
+
+.tera-cutin__shard {
+  position: absolute;
+  top: -40px;
+  width: 12px;
+  height: 20px;
+  background: linear-gradient(#e8fbff, #6fd8f2);
+  clip-path: polygon(50% 0%, 100% 35%, 50% 100%, 0% 35%);
+  animation: tera-fall 900ms ease-in infinite;
+}
+
+@keyframes tera-fall {
+  0% { transform: translateY(0) rotate(0deg); opacity: 0; }
+  20% { opacity: 1; }
+  100% { transform: translateY(110vh) rotate(180deg); opacity: 0.2; }
+}
+
+.tera-cutin__stage {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 210px;
+  height: 210px;
+}
+
+/* お ひろめ のときに つつむ けっしょう */
+.tera-cutin__gem {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(150deg, rgba(110, 226, 255, 0.9), rgba(196, 160, 255, 0.85));
+  clip-path: polygon(50% 0%, 93% 26%, 93% 74%, 50% 100%, 7% 74%, 7% 26%);
+  animation: tera-gem 900ms ease-out;
+}
+
+@keyframes tera-gem {
+  0% { transform: scale(1.6) rotate(-20deg); opacity: 0; }
+  60% { transform: scale(1) rotate(0deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0deg); opacity: 0.9; }
+}
+
+.tera-cutin__figure {
+  position: relative;
+  z-index: 1;
+  color: #fff;
+  filter: drop-shadow(0 8px 20px rgba(0, 0, 0, 0.5));
+}
+
+.tera-cutin__figure svg {
+  color: #fff !important;
+}
+
+.tera-cutin--gather .tera-cutin__figure {
+  animation: tera-shiver 180ms linear infinite;
+}
+
+@keyframes tera-shiver {
+  0%, 100% { transform: translate(-2px, 0); }
+  50% { transform: translate(2px, -2px); }
+}
+
+.tera-cutin--reveal .tera-cutin__figure {
+  animation: tera-pop 700ms cubic-bezier(0.2, 1.5, 0.4, 1);
+}
+
+@keyframes tera-pop {
+  0% { transform: scale(0.5); opacity: 0.2; }
+  60% { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); }
+}
+
+.tera-cutin__flash {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 50%, #fff 0%, #dff7ff 38%, rgba(255, 255, 255, 0) 72%);
+  animation: tera-flash 700ms ease-out forwards;
+}
+
+@keyframes tera-flash {
+  0% { opacity: 0; transform: scale(0.3); }
+  25% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.6); }
+}
+
+.tera-cutin__words {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  animation: pop 400ms ease-out both;
+}
+
+.tera-cutin__title {
+  font-size: 32px;
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 2px 10px rgba(20, 130, 180, 0.95);
+}
+
+.tera-cutin__name {
+  font-size: 22px;
+  font-weight: 900;
+  color: #9ef0ff;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+}
+
+.tera-cutin__caption {
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+}
+
+/* だれを テラスタル させるか えらぶ */
+.tera-pick {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.tera-pick__btn {
+  flex: 1 1 0;
+  min-width: 84px;
+  min-height: 96px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 4px;
+  border: 3px solid #2bb8d8;
+  border-radius: 14px;
+  background: linear-gradient(140deg, #fff, #e2f8ff);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
 /* 動きを減らす設定の端末では、点滅させない */
 @media (prefers-reduced-motion: reduce) {
   .mega-stage__glow,
@@ -917,6 +1085,10 @@ body {
   .mega-end__glow,
   .mega-end__ring,
   .mega-end__shard,
+  .tera-cutin__shard,
+  .tera-cutin__gem,
+  .tera-cutin__figure,
+  .tera-cutin__flash,
   .card--selectable,
   .dice-button,
   .die--rolling,
@@ -1592,6 +1764,29 @@ body {
 .move-btn--mega {
   background: linear-gradient(90deg, #b06bd8, #e0417a);
   border-color: #ffd24a;
+}
+
+/* テラスタルわざ のボタン */
+.move-btn--tera {
+  background: linear-gradient(120deg, #2bb8d8, #7b6bd8);
+}
+
+/* せんよう わざ（メガ・テラスタル）。ふつうの わざ より すこし ひくくして、
+   「えらびなおす」まで 画面に おさめる */
+.move-btn--special {
+  min-height: 54px;
+  font-size: 15px;
+}
+
+.move-btn--special .move-btn__sub {
+  font-size: 11px;
+}
+
+/* バトル中の「えらびなおす」。わざが 4つ ならんでも 画面に おさまるように ひくくする */
+.btn--compact {
+  min-height: 40px;
+  padding: 6px 14px;
+  font-size: 17px;
 }
 
 

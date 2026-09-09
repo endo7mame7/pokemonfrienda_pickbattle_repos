@@ -8,6 +8,8 @@ interface Props {
   shape?: SilhouetteShape | undefined;
   /** メガシンカ中は とがった オーラ と つの が付いて、つよそうに見える */
   mega?: boolean;
+  /** テラスタル中は まわりに けっしょう が うかび、あたまに かんむり が つく（§3.11） */
+  tera?: boolean;
 }
 
 /**
@@ -15,23 +17,28 @@ interface Props {
  * 「なんとなくそれっぽい かげ」だけを出す。
  * 形は名前から決まるので、同じポケモンなら いつも同じ かげ になる。
  */
-export function Silhouette({ name, type, size, shape, mega = false }: Props) {
+export function Silhouette({ name, type, size, shape, mega = false, tera = false }: Props) {
   const color = silhouetteColor(type);
+  const label = [mega ? 'メガシンカした' : '', tera ? 'テラスタルした' : '', `${name}の かげ`]
+    .filter(Boolean)
+    .join(' ');
   return (
     <svg
       viewBox="0 0 100 100"
       width={size}
       height={size}
       role="img"
-      aria-label={mega ? `メガシンカした ${name}の かげ` : `${name}の かげ`}
+      aria-label={label}
       style={{ display: 'block', color }}
     >
       <ellipse cx="50" cy="92" rx="30" ry="5" fill="currentColor" opacity="0.18" />
       {mega && <g fill="currentColor">{renderMegaAura()}</g>}
+      {tera && <g fill="currentColor">{renderTeraShards()}</g>}
       <g fill="currentColor" transform={mega ? 'translate(50 54) scale(0.88) translate(-50 -54)' : undefined}>
         {renderShape(shape ?? shapeForName(name))}
       </g>
       {mega && <g fill="currentColor">{renderMegaCrest()}</g>}
+      {tera && <g fill="currentColor">{renderTeraCrown()}</g>}
     </svg>
   );
 }
@@ -52,6 +59,35 @@ function renderMegaAura() {
     ].join(' ');
     return <polygon key={index} points={points} opacity="0.5" />;
   });
+}
+
+/** テラスタル中に まわりに うかぶ けっしょう（ダイヤの かたち） */
+function renderTeraShards() {
+  const shards = [
+    { x: 16, y: 30, r: 7 },
+    { x: 84, y: 34, r: 6 },
+    { x: 22, y: 68, r: 5 },
+    { x: 80, y: 70, r: 6.5 },
+    { x: 50, y: 12, r: 5 },
+  ];
+  return shards.map(({ x, y, r }, index) => (
+    <polygon
+      key={index}
+      points={`${x},${y - r} ${x + r * 0.7},${y} ${x},${y + r} ${x - r * 0.7},${y}`}
+      opacity="0.55"
+    />
+  ));
+}
+
+/** あたまの うえ の けっしょう の かんむり */
+function renderTeraCrown() {
+  return (
+    <>
+      <polygon points="50,-4 58,12 50,20 42,12" />
+      <polygon points="34,10 39,20 34,26 29,20" opacity="0.8" />
+      <polygon points="66,10 71,20 66,26 61,20" opacity="0.8" />
+    </>
+  );
 }
 
 /** あたまの うえ の とがった かんむり */
