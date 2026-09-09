@@ -7,8 +7,11 @@ import type { BattleSpeed, DamageMultiplier, PokemonType } from './types';
  */
 export type MoveKind = 'normal' | 'strong' | 'mega' | 'tera';
 
-/** ゲージを とめて ねらう わざ（メガわざ は連打なので ふくまない） */
-export type TimingMoveKind = Exclude<MoveKind, 'mega'>;
+/**
+ * ゲージを とめて ねらう わざ。
+ * メガわざ は 連打、テラスタルわざ は けっしょうタップ なので ふくまない。
+ */
+export type TimingMoveKind = Exclude<MoveKind, 'mega' | 'tera'>;
 
 /**
  * わざの ちから（docs/SPEC.md §3.4）。
@@ -21,7 +24,10 @@ export const MOVE_POWER: Record<MoveKind, number> = {
   strong: 300,
   /** メガわざ。ねらう必要がないぶん、最大でも つよいわざ の ぴったり には とどかない */
   mega: 140,
-  /** テラスタルわざ。あいて ぜんいん に 等分して当たるので、合計の ちから（§3.11） */
+  /**
+   * テラスタルわざ。けっしょう を ぜんぶ タップ したときの ちから で、
+   * あいて ぜんいん に 等分して当たる（§3.11）
+   */
   tera: 450,
 };
 

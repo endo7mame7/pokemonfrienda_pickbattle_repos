@@ -8,6 +8,7 @@
  *  - 毎ターン きかれない。💎 ボタンを おしたときだけ えらぶ画面が 出る
  *  - せんよう カットイン が出て、かげ に けっしょう が つく
  *  - ゲージが うんと ゆっくりになる（1往復の じかん を はかる）
+ *  - テラスタルわざ は ゲージ ではなく **けっしょうタップ**
  *  - テラスタルわざ が あいて ぜんいん に あたり、ダメージが 等分される
  *  - バトルで 1回だけ（つかったら ボタンが 消える）
  *  - テラスタルした子は こうげきの つぎの ターンは やすみ（⏸・えらべない）
@@ -98,6 +99,8 @@ const teraUsedBy = new Set();
 let pickedMove = null;    // いま えらんだ わざ（'tera' か 'other'）
 let restedAfterAttack = null;  // テラスタルした子が つぎの ターン やすみ に なったか
 let teraAttacks = 0;      // テラスタルした子が こうげき した かいすう
+let crystalsShown = 0;    // けっしょう が いくつ 出たか
+let crystalsTapped = 0;   // そのうち いくつ タップ できたか
 
 /** いま だれの 手番か。下に出ている「じぶん（あか / あお）」で 見わける */
 const currentPlayer = async () => {
@@ -175,6 +178,22 @@ for (let i = 0; i < 400; i += 1) {
     }
     continue;
   }
+  // テラスタルわざ。ちらばった けっしょう を ぜんぶ タップする
+  if (body.includes('けっしょうを ぜんぶ タップ')) {
+    await page.waitForTimeout(400); // ぜんぶ 出そろってから とる
+    await shot('63b-crystal-tap');
+    const crystals = page.locator('.crystal:not(.crystal--taken)');
+    crystalsShown = await crystals.count();
+    for (let c = 0; c < crystalsShown; c += 1) {
+      const one = page.locator('.crystal:not(.crystal--taken)').first();
+      if (!(await one.count())) break;
+      await one.click({ force: true });
+      crystalsTapped += 1;
+    }
+    await page.waitForTimeout(2800);
+    continue;
+  }
+
   if (body.includes('まんなかで とめよう')) {
     // こうげきする子が テラスタル しているか で、ゲージの はやさ を くらべる
     const attackerIsTera =
@@ -214,6 +233,7 @@ const evenlySplit =
 const summary = {
   sawButton, sawPrompt, promptedWithoutTap, teraCutIn, teraCards, normalCycle, teraCycle,
   slower: normalCycle && teraCycle ? teraCycle / normalCycle : null,
+  crystalsShown, crystalsTapped,
   hpBefore, hpAfter, dealt, hitAll, evenlySplit, teraAttacks, restedAfterAttack,
   askedAgain, overflow, errors,
 };
@@ -228,6 +248,8 @@ const ok =
   teraCards > 0 &&              // かげ に けっしょう が ついた
   teraCycle !== null && normalCycle !== null &&
   teraCycle > normalCycle * 1.8 &&  // ゲージが うんと ゆっくり
+  crystalsShown >= 6 &&         // けっしょう が ちらばって 出た
+  crystalsTapped === crystalsShown && // ぜんぶ タップ できた
   hitAll &&                     // ぜんいん に あたった
   evenlySplit &&                // ダメージが 等分されている
   !askedAgain &&                // 2回目は きかれない

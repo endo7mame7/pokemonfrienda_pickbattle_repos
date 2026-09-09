@@ -1,6 +1,7 @@
 export * from './types';
 export * from './typeChart';
 export * from './moves';
+export * from './crystalTap';
 export * from './timing';
 export * from './mash';
 export * from './dice';

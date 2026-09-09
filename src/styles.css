@@ -1078,6 +1078,96 @@ body {
   cursor: pointer;
 }
 
+
+/* --- テラスタルわざ の けっしょうタップ（docs/SPEC.md §3.11） --- */
+.crystal-tap {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 45%, rgba(110, 226, 255, 0.18), rgba(20, 30, 45, 0.3));
+}
+
+.crystal-tap__head {
+  position: absolute;
+  top: 6px;
+  left: 10px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  /* うしろに カードや ラベル が あるので、白い おび にして 読めるようにする */
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.crystal-tap__count {
+  font-size: 17px;
+  font-weight: 900;
+  color: #0d3d4d;
+  text-shadow: 0 1px 0 #fff;
+  white-space: nowrap;
+}
+
+.crystal-tap__timer {
+  flex: 1;
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.75);
+  overflow: hidden;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+
+.crystal-tap__timer-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #2bb8d8, #7b6bd8);
+}
+
+/* けっしょう ひとつ。ゆびで おしやすい 大きさ にする */
+.crystal {
+  position: absolute;
+  width: 68px;
+  height: 68px;
+  margin: -34px 0 0 -34px;
+  padding: 0;
+  border: none;
+  /* こおり っぽい 水色 から、そのポケモンの タイプの色 へ */
+  background: linear-gradient(150deg, #f2fdff 0%, #7fe0f5 42%, var(--crystal-color) 100%);
+  clip-path: polygon(50% 0%, 92% 30%, 92% 70%, 50% 100%, 8% 70%, 8% 30%);
+  filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.45));
+  cursor: pointer;
+  transform: rotate(var(--crystal-spin));
+  animation: crystal-in 320ms cubic-bezier(0.2, 1.5, 0.4, 1) both;
+  touch-action: manipulation;
+}
+
+/* けっしょう の ひかり。ただの 六角形 に 見えないように 面 を1つ入れる */
+.crystal__shine {
+  position: absolute;
+  inset: 0;
+  clip-path: polygon(50% 0%, 92% 30%, 50% 46%, 8% 30%);
+  background: rgba(255, 255, 255, 0.75);
+  pointer-events: none;
+}
+
+@keyframes crystal-in {
+  0% { transform: rotate(var(--crystal-spin)) scale(0.2); opacity: 0; }
+  100% { transform: rotate(var(--crystal-spin)) scale(1); opacity: 1; }
+}
+
+/* とった けっしょう。はじけて 消える */
+.crystal--taken {
+  pointer-events: none;
+  animation: crystal-out 260ms ease-out forwards;
+}
+
+@keyframes crystal-out {
+  0% { transform: rotate(var(--crystal-spin)) scale(1); opacity: 1; }
+  100% { transform: rotate(calc(var(--crystal-spin) + 90deg)) scale(1.8); opacity: 0; }
+}
+
 /* 動きを減らす設定の端末では、点滅させない */
 @media (prefers-reduced-motion: reduce) {
   .mega-stage__glow,
@@ -1095,6 +1185,7 @@ body {
   .tera-cutin__gem,
   .tera-cutin__figure,
   .tera-cutin__flash,
+  .crystal,
   .card--selectable,
   .dice-button,
   .die--rolling,

@@ -25,6 +25,8 @@ export type AttackInput =
   | { style: 'dice'; rolls: number[] }
   /** power は とめた段の ちから。timing は 見せかたの ラベル */
   | { style: 'timing'; move: TimingMoveKind; power: number; timing: TimingResult }
+  /** テラスタルわざ。けっしょう を とれた ぶん の ちから（§3.11） */
+  | { style: 'tap'; power: number; fill: number }
   /** メガわざ。fill は ゲージの たまりぐあい（0〜1） */
   | { style: 'mash'; fill: number };
 
@@ -48,13 +50,14 @@ export function calcDamage(
   let damage: number;
   if (input.style === 'dice') {
     damage = input.rolls.reduce((sum, roll) => sum + roll, 0) * settings.damageMultiplier;
-  } else if (input.style === 'timing') {
+  } else if (input.style === 'timing' || input.style === 'tap') {
     damage = input.power * SPEED_POWER_SCALE[settings.battleSpeed] * megaBoost;
   } else {
     damage = movePower('mega', settings.battleSpeed) * mashMultiplier(input.fill) * megaBoost;
   }
 
-  // つよいわざ を 大きく はずすと まるごと 0。ばつぐん ボーナスも のらない
+  // つよいわざ を 大きく はずす／けっしょう が 1つも とれない と まるごと 0。
+  // ばつぐん ボーナスも のらない
   // （「はずれ なのに ばつぐん +20」に ならないように）
   if (damage === 0) {
     return { damage: 0, isSuperEffective: false, isTired: tired };
