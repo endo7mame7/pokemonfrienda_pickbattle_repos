@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   battleReducer,
+  canAttack,
   createBattle,
   diceCountForTurn,
   isAlive,
@@ -714,6 +715,111 @@ describe('テラスタル（docs/SPEC.md §3.11）', () => {
     expect(state.teams.p1[0]!.megaEvolved).toBe(false);
     // メガシンカ の フラグ は テラスタル で 変わらない
     expect(state.teraUsed.p1).toBe(true);
+  });
+
+  it('テラスタル中の子は こうげきした つぎの じぶんの ターンは やすみ', () => {
+    let state = start(); // 3vs3
+    state = apply(state, { type: 'openTeraPrompt' }, { type: 'terastallize', index: 0 }, { type: 'next' });
+
+    const teraTurn = state.turnCount;
+    state = apply(
+      state,
+      { type: 'selectAttacker', index: 0 },
+      { type: 'selectTarget', index: 0 },
+      { type: 'chooseMove', move: 'normal' },
+      { type: 'stopTiming', position: 0.5 },
+      { type: 'next' },
+    );
+    // こうげきした ので、つぎの じぶんの ターン（+2）までは やすみ
+    expect(state.teams.p1[0]!.restUntilTurn).toBe(teraTurn + 2);
+    expect(canAttack(state.teams.p1[0]!, teraTurn + 2)).toBe(false);
+    expect(canAttack(state.teams.p1[0]!, teraTurn + 4)).toBe(true);
+    // なかまは やすみ に ならない
+    expect(state.teams.p1[1]!.restUntilTurn).toBe(0);
+
+    // 手番を まわして じぶんの ターンに もどす
+    state = apply(
+      state,
+      { type: 'next' },
+      { type: 'next' }, // p2 の ターン
+      { type: 'selectAttacker', index: 0 },
+      { type: 'selectTarget', index: 0 },
+      { type: 'chooseMove', move: 'normal' },
+      { type: 'stopTiming', position: 0.5 },
+      { type: 'next' },
+      { type: 'next' },
+      { type: 'next' }, // p1 の ターン
+    );
+    expect(state.turnPlayer).toBe('p1');
+    expect(state.phase).toBe('selectAttacker');
+
+    // やすみ中の子は えらべない
+    expect(battleReducer(state, { type: 'selectAttacker', index: 0 }).phase).toBe('selectAttacker');
+    // なかまは えらべる
+    expect(battleReducer(state, { type: 'selectAttacker', index: 1 }).phase).toBe('selectTarget');
+  });
+
+  it('テラスタル していない子は なんターンでも つづけて こうげき できる', () => {
+    let state = start();
+    const before = state.turnCount;
+    state = apply(
+      state,
+      { type: 'selectAttacker', index: 0 },
+      { type: 'selectTarget', index: 0 },
+      { type: 'chooseMove', move: 'normal' },
+      { type: 'stopTiming', position: 0.5 },
+      { type: 'next' },
+    );
+    expect(state.teams.p1[0]!.restUntilTurn).toBe(0);
+    expect(canAttack(state.teams.p1[0]!, before + 2)).toBe(true);
+  });
+
+  it('1vs1 で みんな やすみ中 なら、その ターンは とばす', () => {
+    let state = createBattle(
+      [makePick({ energy: 900 })],
+      [makePick({ energy: 900 })],
+      'p1',
+      teraSettings,
+    );
+    state = apply(state, { type: 'openTeraPrompt' }, { type: 'terastallize', index: 0 }, { type: 'next' });
+    state = apply(
+      state,
+      { type: 'selectAttacker', index: 0 },
+      { type: 'selectTarget', index: 0 },
+      { type: 'chooseMove', move: 'normal' },
+      { type: 'stopTiming', position: 0.5 },
+      { type: 'next' },
+      { type: 'next' },
+      { type: 'next' }, // p2 の ターン
+      { type: 'selectAttacker', index: 0 },
+      { type: 'selectTarget', index: 0 },
+      { type: 'chooseMove', move: 'normal' },
+      { type: 'stopTiming', position: 0.5 },
+      { type: 'next' },
+      { type: 'next' },
+      { type: 'next' }, // p1 の ターン。1体しか いないので やすみ
+    );
+    expect(state.turnPlayer).toBe('p1');
+    expect(state.phase).toBe('restSkip');
+
+    // つぎへ で 手番を わたす
+    state = apply(state, { type: 'next' });
+    expect(state.phase).toBe('handOff');
+
+    // そのつぎの じぶんの ターンでは また こうげき できる
+    state = apply(
+      state,
+      { type: 'next' }, // p2 の ターン
+      { type: 'selectAttacker', index: 0 },
+      { type: 'selectTarget', index: 0 },
+      { type: 'chooseMove', move: 'normal' },
+      { type: 'stopTiming', position: 0.5 },
+      { type: 'next' },
+      { type: 'next' },
+      { type: 'next' }, // p1 の ターン
+    );
+    expect(state.turnPlayer).toBe('p1');
+    expect(state.phase).toBe('selectAttacker');
   });
 
   it('サイコロ方式では 💎 ボタンを 出さない', () => {

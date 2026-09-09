@@ -14,6 +14,7 @@ import {
   battleReducer,
   createBattle,
   diceCountForTurn,
+  canAttack,
   isAlive,
   randomDie,
   rollDice,
@@ -145,7 +146,7 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
 
   const chooseAttacker = (index: number) => {
     const pokemon = state.teams[attackerSide][index];
-    if (!pokemon || !isAlive(pokemon)) return;
+    if (!pokemon || !canAttack(pokemon, state.turnCount)) return;
     if (settings.fatigueEnabled && pokemon.tired) {
       setTiredConfirmIndex(index);
       return;
@@ -210,7 +211,10 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
             key={pokemon.pickId + index}
             pokemon={pokemon}
             cardId={`${side}-${index}`}
-            selectable={selectable && isAlive(pokemon)}
+            selectable={
+              selectable && (isAttackerSide ? canAttack(pokemon, state.turnCount) : isAlive(pokemon))
+            }
+            resting={isAttackerSide && isAlive(pokemon) && !canAttack(pokemon, state.turnCount)}
             selected={
               isAttackerSide
                 ? state.selectedAttackerIndex === index
@@ -538,6 +542,24 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
               onClick={() => dispatch({ type: 'declineTera' })}
             >
               やめる
+            </button>
+          </div>
+        </div>
+      )}
+
+      {state.phase === 'restSkip' && (
+        <div className="overlay">
+          <div className="overlay__panel">
+            <div style={{ fontSize: 48 }}>⏸</div>
+            <div className="overlay__title" style={{ fontSize: 22 }}>
+              こうげき できる子が いない
+            </div>
+            <p style={{ margin: 0 }}>
+              テラスタルした子は こうげきの つぎの ターンは やすみ。
+              この ターンは とばすよ。
+            </p>
+            <button type="button" className="btn" onClick={() => dispatch({ type: 'next' })}>
+              つぎへ
             </button>
           </div>
         </div>

@@ -19,6 +19,8 @@ export type BattlePhase =
   | 'teraPrompt'
   /** テラスタル の演出中 */
   | 'teraChanging'
+  /** こうげきできる子が いない。ターンを とばす（§3.11） */
+  | 'restSkip'
   | 'selectAttacker'
   | 'selectTarget'
   /** どの わざ を つかう？（タイミングのとき） */
@@ -132,6 +134,7 @@ export function toBattlePokemon(pick: Pick): BattlePokemon {
     megaEvolved: false,
     megaUsed: false,
     terastallized: false,
+    restUntilTurn: 0,
     tired: false,
     damageDealt: 0,
   };
@@ -163,6 +166,19 @@ export function createBattle(
 }
 
 export const isAlive = (pokemon: BattlePokemon): boolean => pokemon.hp > 0;
+
+/**
+ * いま こうげき できるか。
+ * テラスタル中の子は こうげきした つぎの じぶんの ターンが やすみ になる（§3.11）。
+ */
+export function canAttack(pokemon: BattlePokemon, turnCount: number): boolean {
+  return isAlive(pokemon) && turnCount > pokemon.restUntilTurn;
+}
+
+/** そのチームに こうげき できる子が いるか */
+export function hasAttacker(team: BattlePokemon[], turnCount: number): boolean {
+  return team.some((pokemon) => canAttack(pokemon, turnCount));
+}
 
 export const isTeamWipedOut = (team: BattlePokemon[]): boolean => !team.some(isAlive);
 
@@ -256,7 +272,7 @@ function resolveAttack(state: BattleState, input: AttackInput): BattleState {
 }
 
 /** ターンのはじめ。メガシンカ できる子がいれば、まずそれを聞く */
-function startTurn(state: BattleState, turnPlayer: PlayerId): BattleState {
+function startTurn(state: BattleState, turnPlayer: PlayerId, turnCount = state.turnCount): BattleState {
   const teams = cloneTeams(state.teams);
   // 仲間がたおれて1体だけになったら、つかれは消す（もう交代できないため）
   if (state.settings.fatigueEnabled) clearFatigueIfAlone(teams[turnPlayer]);
@@ -272,11 +288,19 @@ function startTurn(state: BattleState, turnPlayer: PlayerId): BattleState {
     state.settings.attackStyle === 'timing' &&
     teams[turnPlayer].some(isAlive);
 
+  // みんな やすみ中 なら、この ターンは とばす（§3.11）
+  const nextPhase: BattlePhase = !hasAttacker(teams[turnPlayer], turnCount)
+    ? 'restSkip'
+    : megaCandidateIndex === null
+      ? 'selectAttacker'
+      : 'megaPrompt';
+
   return {
     ...state,
     teams,
     turnPlayer,
-    phase: megaCandidateIndex === null ? 'selectAttacker' : 'megaPrompt',
+    turnCount,
+    phase: nextPhase,
     megaCandidateIndex,
     teraOffer,
     selectedAttackerIndex: null,
@@ -333,8 +357,8 @@ export function battleReducer(state: BattleState, action: BattleAction): BattleS
     case 'selectAttacker': {
       if (state.phase !== 'selectAttacker' && state.phase !== 'selectTarget') return state;
       const pokemon = state.teams[state.turnPlayer][action.index];
-      // ひんしのポケモンは選べない
-      if (!pokemon || !isAlive(pokemon)) return state;
+      // ひんし の子と、テラスタルの やすみ中 の子は選べない
+      if (!pokemon || !canAttack(pokemon, state.turnCount)) return state;
       return {
         ...state,
         phase: 'selectTarget',
@@ -440,6 +464,15 @@ export function battleReducer(state: BattleState, action: BattleAction): BattleS
           return { ...hit, fainted: defender.hp === 0 };
         });
 
+        /*
+         * テラスタル中の子は、こうげきすると **つぎの じぶんの ターンは やすみ**（§3.11）。
+         * ターンばんごう は 手番ごとに 1ふえるので、じぶんの つぎの ターンは +2。
+         * ずっと ゆっくりの ゲージ が つかえる かわりの だいしょう。
+         */
+        if (attacker.terastallized) {
+          attacker.restUntilTurn = state.turnCount + 2;
+        }
+
         // メガわざ は ちからを つかいきる わざ。うつと メガシンカ が とけて、
         // もう一度は メガシンカ できない（docs/SPEC.md §3.6）
         const megaEnded = result.moveKind === 'mega' && attacker.megaEvolved;
@@ -481,10 +514,12 @@ export function battleReducer(state: BattleState, action: BattleAction): BattleS
       }
 
       if (state.phase === 'handOff') {
-        return {
-          ...startTurn(state, OPPONENT_OF[state.turnPlayer]),
-          turnCount: state.turnCount + 1,
-        };
+        return startTurn(state, OPPONENT_OF[state.turnPlayer], state.turnCount + 1);
+      }
+
+      // みんな やすみ中 だった。なにもせず 手番を わたす
+      if (state.phase === 'restSkip') {
+        return { ...state, phase: 'handOff' };
       }
 
       return state;

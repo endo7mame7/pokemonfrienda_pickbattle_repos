@@ -9,7 +9,8 @@
  *  - せんよう カットイン が出て、かげ に けっしょう が つく
  *  - ゲージが うんと ゆっくりになる（1往復の じかん を はかる）
  *  - テラスタルわざ が あいて ぜんいん に あたり、ダメージが 等分される
- *  - バトルで 1回だけ（つかったら もう きかれない）
+ *  - バトルで 1回だけ（つかったら ボタンが 消える）
+ *  - テラスタルした子は こうげきの つぎの ターンは やすみ（⏸・えらべない）
  */
 import { chromium } from 'playwright';
 
@@ -95,6 +96,8 @@ let hpAfter = null;
 let askedAgain = false;   // おなじ人に 2回 きいたら だめ
 const teraUsedBy = new Set();
 let pickedMove = null;    // いま えらんだ わざ（'tera' か 'other'）
+let restedAfterAttack = null;  // テラスタルした子が つぎの ターン やすみ に なったか
+let teraAttacks = 0;      // テラスタルした子が こうげき した かいすう
 
 /** いま だれの 手番か。下に出ている「じぶん（あか / あお）」で 見わける */
 const currentPlayer = async () => {
@@ -119,6 +122,14 @@ for (let i = 0; i < 400; i += 1) {
   if (body.includes('メガシンカ できる！')) { await page.getByText('いまは しない').click(); continue; }
   if (body.includes('だれで こうげきする')) {
     const who = await currentPlayer();
+    // テラスタルした子が こうげき した あとは、つぎの じぶんの ターンで やすみ（⏸）に なるはず
+    if (who === 'p1' && teraAttacks > 0 && restedAfterAttack === null) {
+      restedAfterAttack = await page.evaluate(() => {
+        const card = document.querySelector('[data-role=attacker] .card--tera');
+        return card ? card.classList.contains('card--resting') && card.disabled : null;
+      });
+      await shot('65-tera-resting');
+    }
     const teraButton = page.getByText('テラスタル する', { exact: false });
     if (await teraButton.count()) {
       sawButton = true;
@@ -141,9 +152,9 @@ for (let i = 0; i < 400; i += 1) {
         continue;
       }
     }
-    // テラスタルした子（かげに けっしょう）が いれば その子で
+    // テラスタルした子（かげに けっしょう）が えらべれば その子で
     const tera = page.locator('[data-role=attacker] .card--tera.card--selectable');
-    if (await tera.count()) await tera.first().click({ force: true });
+    if (await tera.count()) { await tera.first().click({ force: true }); teraAttacks += 1; }
     else await page.locator('[data-role=attacker] .card--selectable').first().click({ force: true });
     continue;
   }
@@ -203,7 +214,8 @@ const evenlySplit =
 const summary = {
   sawButton, sawPrompt, promptedWithoutTap, teraCutIn, teraCards, normalCycle, teraCycle,
   slower: normalCycle && teraCycle ? teraCycle / normalCycle : null,
-  hpBefore, hpAfter, dealt, hitAll, evenlySplit, askedAgain, overflow, errors,
+  hpBefore, hpAfter, dealt, hitAll, evenlySplit, teraAttacks, restedAfterAttack,
+  askedAgain, overflow, errors,
 };
 console.log(JSON.stringify(summary, null, 2));
 await browser.close();
@@ -219,6 +231,7 @@ const ok =
   hitAll &&                     // ぜんいん に あたった
   evenlySplit &&                // ダメージが 等分されている
   !askedAgain &&                // 2回目は きかれない
+  restedAfterAttack === true && // こうげきの つぎの ターンは やすみ で えらべない
   overflow.x === 0 && overflow.y === 0 &&
   errors.length === 0;
 

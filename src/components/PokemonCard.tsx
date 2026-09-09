@@ -15,6 +15,8 @@ interface Props {
   selectable: boolean;
   selected: boolean;
   dimmed: boolean;
+  /** テラスタルの やすみ中。この ターンは こうげき できない（§3.11） */
+  resting?: boolean;
   hit?: HitEffect | undefined;
   onSelect?: () => void;
 }
@@ -27,7 +29,7 @@ function hpColor(ratio: number): string {
 
 /** たいりょくは 数値・バー・色 の3つで伝える（UX要件 U-7） */
 export function PokemonCard({
-  pokemon, cardId, selectable, selected, dimmed, hit, onSelect,
+  pokemon, cardId, selectable, selected, dimmed, resting = false, hit, onSelect,
 }: Props) {
   const fainted = pokemon.hp <= 0;
   const ratio = pokemon.maxHp === 0 ? 0 : pokemon.hp / pokemon.maxHp;
@@ -41,6 +43,7 @@ export function PokemonCard({
     pokemon.tired && !fainted && 'card--tired',
     pokemon.megaEvolved && !fainted && 'card--mega',
     pokemon.terastallized && !fainted && 'card--tera',
+    resting && !fainted && 'card--resting',
     hit && 'card--hit',
   ]
     .filter(Boolean)
@@ -66,7 +69,9 @@ export function PokemonCard({
           {fainted && '✕'}
           {!fainted && pokemon.megaEvolved && '🌈'}
           {!fainted && pokemon.terastallized && '💎'}
-          {!fainted && pokemon.tired && '💤'}
+          {!fainted && resting && '⏸'}
+          {/* やすみ中 は こうげき じたい できないので、つかれ の 💤 は 出さない */}
+          {!fainted && !resting && pokemon.tired && '💤'}
         </div>
         <Silhouette
           name={pokemon.name}

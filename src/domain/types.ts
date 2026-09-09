@@ -60,6 +60,11 @@ export interface BattlePokemon {
   megaUsed: boolean;
   /** テラスタル中。ゲージが うんと ゆっくりになり、テラスタルわざ が つかえる（§3.11） */
   terastallized: boolean;
+  /**
+   * この ターンばんごう までは こうげき できない（0 なら やすみ なし）。
+   * テラスタル中の子が こうげきすると、つぎの じぶんの ターンは やすみ になる（§3.11）。
+   */
+  restUntilTurn: number;
   /** 全力で攻撃した次のターン。ダメージが半分になる */
   tired: boolean;
   /** MVP 判定に使う累計与ダメージ */
