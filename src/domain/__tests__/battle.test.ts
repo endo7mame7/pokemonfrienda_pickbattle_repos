@@ -455,7 +455,7 @@ describe('メガわざ は ちからを つかいきる（docs/SPEC.md §3.6）'
   /** あいてに 1発もらって たいりょくを へらし、p1 を メガシンカ ずみ にする */
   function megaReady() {
     let state = createBattle(
-      [makePick({ canMegaEvolve: true, energy: 400 })],
+      [makePick({ canMegaEvolve: true, energy: 360 })],
       [makePick({ energy: 3000 })],
       'p2', // あいてが さきに こうげき する
       timingSettings,

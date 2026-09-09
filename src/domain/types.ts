@@ -93,6 +93,9 @@ export type AttackStyle = 'timing' | 'dice';
 /** バトルの ながさ。わざの ちから と サイコロの ばいりつ を同時に決める */
 export type BattleSpeed = 'fast' | 'normal' | 'slow';
 
+/** ゲージが 左右に うごく はやさ。はやいほど ねらいにくい */
+export type GaugeSpeed = 'slow' | 'normal' | 'fast';
+
 export type DamageMultiplier = 10 | 20 | 30;
 export type SuperEffectiveBonus = 0 | 10 | 20 | 40 | 60;
 
@@ -100,6 +103,7 @@ export type SuperEffectiveBonus = 0 | 10 | 20 | 40 | 60;
 export interface Settings {
   attackStyle: AttackStyle;
   battleSpeed: BattleSpeed;
+  gaugeSpeed: GaugeSpeed;
   damageMultiplier: DamageMultiplier;
   superEffectiveBonus: SuperEffectiveBonus;
   megaThreshold: MegaThreshold;
@@ -111,6 +115,7 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Settings = {
   attackStyle: 'timing',
   battleSpeed: 'normal',
+  gaugeSpeed: 'normal',
   damageMultiplier: 20,
   superEffectiveBonus: 20,
   megaThreshold: 'third',
