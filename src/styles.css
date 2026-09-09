@@ -241,6 +241,12 @@ body {
   background: linear-gradient(140deg, #fff, #ffe9fb);
 }
 
+/* テラスタルの やすみ中。この ターンは こうげき できない（§3.11） */
+.card--resting {
+  opacity: 0.55;
+  filter: grayscale(0.35);
+}
+
 /* テラスタル中。けっしょう っぽい 水色〜白 の かがやき（§3.11） */
 .card--tera {
   border-color: #2bb8d8;
@@ -1780,6 +1786,13 @@ body {
 
 .move-btn--special .move-btn__sub {
   font-size: 11px;
+}
+
+/* テラスタル を よびだす ボタン。おさなくても すすめる */
+.btn--tera {
+  background: linear-gradient(120deg, #2bb8d8, #7b6bd8);
+  border-color: transparent;
+  color: #fff;
 }
 
 /* バトル中の「えらびなおす」。わざが 4つ ならんでも 画面に おさまるように ひくくする */

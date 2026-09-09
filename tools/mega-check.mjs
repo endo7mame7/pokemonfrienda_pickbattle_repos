@@ -62,7 +62,6 @@ for (let i = 0; i < 400 && mashFill === null; i += 1) {
   if (body.includes('の かち！')) break;
 
   // 手番が変わったら スマホを わたす
-  if (body.includes('テラスタル できる')) { await page.getByText('いまは しない').click(); continue; }
   if (body.includes('スマホを わたしてね')) { await page.getByText('じゅんび できた').click(); continue; }
   if (body.includes('つかれてるよ')) { await page.getByText('これで いく').click(); continue; }
   if (body.includes('メガシンカ できる！')) {

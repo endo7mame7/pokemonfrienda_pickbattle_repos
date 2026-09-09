@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   battleReducer,
+  canAttack,
   createBattle,
   diceCountForTurn,
   isAlive,
@@ -392,7 +393,6 @@ describe('タイミング方式の進行', () => {
   const start = () =>
     apply(
       createBattle([makePick()], [makePick({ energy: 350 })], 'p1', timingSettings),
-      { type: 'declineTera' },
       { type: 'selectAttacker', index: 0 },
       { type: 'selectTarget', index: 0 },
     );
@@ -427,7 +427,6 @@ describe('タイミング方式の進行', () => {
   it('わざの名前は タイプと わざの種類で決まる', () => {
     const fire = apply(
       createBattle([makePick({ type: 'ほのお' })], [makePick()], 'p1', timingSettings),
-      { type: 'declineTera' },
       { type: 'selectAttacker', index: 0 },
       { type: 'selectTarget', index: 0 },
       { type: 'chooseMove', move: 'strong' },
@@ -468,7 +467,7 @@ describe('メガわざ は ちからを つかいきる（docs/SPEC.md §3.6）'
       ...timingTurn('normal', 0.5), // ぴったり。p1 は はんぶん 以下 になる
     );
     expect(state.phase).toBe('megaPrompt');
-    state = apply(state, { type: 'megaEvolve' }, { type: 'next' }, { type: 'declineTera' });
+    state = apply(state, { type: 'megaEvolve' }, { type: 'next' });
     expect(state.teams.p1[0]!.megaEvolved).toBe(true);
     return state;
   }
@@ -476,8 +475,6 @@ describe('メガわざ は ちからを つかいきる（docs/SPEC.md §3.6）'
   /** 1vs1 で 1ターンぶん（わざ えらび 〜 つぎの手番のはじめ まで）進める */
   function timingTurn(move: 'normal' | 'strong', position: number): BattleAction[] {
     return [
-      // テラスタル は この describe では つかわない（phase が ちがえば なにも起きない）
-      { type: 'declineTera' },
       { type: 'selectAttacker', index: 0 },
       { type: 'selectTarget', index: 0 },
       { type: 'chooseMove', move },
@@ -491,7 +488,6 @@ describe('メガわざ は ちからを つかいきる（docs/SPEC.md §3.6）'
   it('メガシンカ中だけ メガわざ を えらべる', () => {
     const normal = apply(
       createBattle([makePick()], [makePick({ energy: 900 })], 'p1', timingSettings),
-      { type: 'declineTera' },
       { type: 'selectAttacker', index: 0 },
       { type: 'selectTarget', index: 0 },
       { type: 'chooseMove', move: 'mega' },
@@ -546,10 +542,9 @@ describe('メガわざ は ちからを つかいきる（docs/SPEC.md §3.6）'
       { type: 'next' }, // attacking → resolve
       { type: 'next' }, // resolve → handOff
       { type: 'next' }, // handOff → あいての ターン
-      { type: 'declineTera' },
     );
     // あいての ターン は わざと はずして、p1 が たおれないようにする
-    state = apply(state, ...timingTurn('normal', 0), { type: 'declineTera' });
+    state = apply(state, ...timingTurn('normal', 0));
 
     expect(state.turnPlayer).toBe('p1');
     const self = state.teams.p1[0]!;
@@ -570,18 +565,33 @@ describe('テラスタル（docs/SPEC.md §3.11）', () => {
     return createBattle(team(), team(), 'p1', teraSettings);
   }
 
-  it('ターンのはじめに テラスタル するか きかれる。ことわれば ふつうに すすむ', () => {
+  it('毎ターン きかれない。💎 を おしたときだけ えらぶ画面になる', () => {
     const state = start();
-    expect(state.phase).toBe('teraPrompt');
-    expect(battleReducer(state, { type: 'declineTera' }).phase).toBe('selectAttacker');
+    // ターンのはじめは ふつうに こうげきする子を えらぶ ところ
+    expect(state.phase).toBe('selectAttacker');
+    expect(state.teraOffer).toBe(true); // 💎 ボタンは 出ている
+
+    const opened = battleReducer(state, { type: 'openTeraPrompt' });
+    expect(opened.phase).toBe('teraPrompt');
+
+    // やめても ボタンは のこる（あとで また ひらける）
+    const closed = battleReducer(opened, { type: 'declineTera' });
+    expect(closed.phase).toBe('selectAttacker');
+    expect(closed.teraOffer).toBe(true);
+    expect(battleReducer(closed, { type: 'openTeraPrompt' }).phase).toBe('teraPrompt');
+  });
+
+  it('こうげきする子を えらぶ ところ でしか ひらけない', () => {
+    const picked = apply(start(), { type: 'selectAttacker', index: 0 });
+    expect(picked.phase).toBe('selectTarget');
+    expect(battleReducer(picked, { type: 'openTeraPrompt' }).phase).toBe('selectTarget');
   });
 
   it('えらんだ子が テラスタル して、チームの 1回を つかいきる', () => {
     let state = createBattle([makePick(), makePick()], [makePick({ energy: 900 })], 'p1', teraSettings);
-    // p1 は ことわり、1ターン すすめて p2 の 手番に する
+    // p1 は つかわず、1ターン すすめて p2 の 手番に する
     state = apply(
       state,
-      { type: 'declineTera' },
       { type: 'selectAttacker', index: 0 },
       { type: 'selectTarget', index: 0 },
       { type: 'chooseMove', move: 'normal' },
@@ -590,10 +600,10 @@ describe('テラスタル（docs/SPEC.md §3.11）', () => {
       { type: 'next' },
       { type: 'next' }, // p2 の ターン へ
     );
-    expect(state.phase).toBe('teraPrompt');
     expect(state.turnPlayer).toBe('p2');
+    expect(state.teraOffer).toBe(true);
 
-    state = apply(state, { type: 'terastallize', index: 0 });
+    state = apply(state, { type: 'openTeraPrompt' }, { type: 'terastallize', index: 0 });
     expect(state.phase).toBe('teraChanging');
     expect(state.teams.p2[0]!.terastallized).toBe(true);
     expect(state.teraUsed.p2).toBe(true);
@@ -605,7 +615,7 @@ describe('テラスタル（docs/SPEC.md §3.11）', () => {
 
   it('テラスタルわざ は テラスタル中の子だけ えらべる', () => {
     let state = start();
-    state = apply(state, { type: 'terastallize', index: 0 }, { type: 'next' });
+    state = apply(state, { type: 'openTeraPrompt' }, { type: 'terastallize', index: 0 }, { type: 'next' });
 
     // テラスタル していない子（index 1）では えらべない
     const other = apply(
@@ -629,6 +639,7 @@ describe('テラスタル（docs/SPEC.md §3.11）', () => {
     let state = start();
     state = apply(
       state,
+      { type: 'openTeraPrompt' },
       { type: 'terastallize', index: 0 },
       { type: 'next' },
       { type: 'selectAttacker', index: 0 },
@@ -655,6 +666,7 @@ describe('テラスタル（docs/SPEC.md §3.11）', () => {
     );
     state = apply(
       state,
+      { type: 'openTeraPrompt' },
       { type: 'terastallize', index: 0 },
       { type: 'next' },
       { type: 'selectAttacker', index: 0 },
@@ -668,9 +680,9 @@ describe('テラスタル（docs/SPEC.md §3.11）', () => {
     expect(state.lastResult!.hits[0]!.damage).toBe(300);
   });
 
-  it('つかったら もう きかれない', () => {
+  it('つかったら 💎 ボタンが 出なくなる', () => {
     let state = start();
-    state = apply(state, { type: 'terastallize', index: 0 }, { type: 'next' });
+    state = apply(state, { type: 'openTeraPrompt' }, { type: 'terastallize', index: 0 }, { type: 'next' });
     // 1ターン まわして 手番を もどす
     state = apply(
       state,
@@ -692,19 +704,125 @@ describe('テラスタル（docs/SPEC.md §3.11）', () => {
     );
     expect(state.turnPlayer).toBe('p1');
     expect(state.teraUsed.p1).toBe(true);
-    expect(state.phase).toBe('selectAttacker'); // もう きかれない
+    expect(state.teraOffer).toBe(false); // もう ボタンは 出ない
+    expect(battleReducer(state, { type: 'openTeraPrompt' }).phase).toBe('selectAttacker');
   });
 
   it('テラスタル中でも メガシンカ は べつに つかえる', () => {
     let state = start();
-    state = apply(state, { type: 'terastallize', index: 0 }, { type: 'next' });
+    state = apply(state, { type: 'openTeraPrompt' }, { type: 'terastallize', index: 0 }, { type: 'next' });
     expect(state.teams.p1[0]!.terastallized).toBe(true);
     expect(state.teams.p1[0]!.megaEvolved).toBe(false);
     // メガシンカ の フラグ は テラスタル で 変わらない
     expect(state.teraUsed.p1).toBe(true);
   });
 
-  it('サイコロ方式では テラスタル を きかない', () => {
+  it('テラスタル中の子は こうげきした つぎの じぶんの ターンは やすみ', () => {
+    let state = start(); // 3vs3
+    state = apply(state, { type: 'openTeraPrompt' }, { type: 'terastallize', index: 0 }, { type: 'next' });
+
+    const teraTurn = state.turnCount;
+    state = apply(
+      state,
+      { type: 'selectAttacker', index: 0 },
+      { type: 'selectTarget', index: 0 },
+      { type: 'chooseMove', move: 'normal' },
+      { type: 'stopTiming', position: 0.5 },
+      { type: 'next' },
+    );
+    // こうげきした ので、つぎの じぶんの ターン（+2）までは やすみ
+    expect(state.teams.p1[0]!.restUntilTurn).toBe(teraTurn + 2);
+    expect(canAttack(state.teams.p1[0]!, teraTurn + 2)).toBe(false);
+    expect(canAttack(state.teams.p1[0]!, teraTurn + 4)).toBe(true);
+    // なかまは やすみ に ならない
+    expect(state.teams.p1[1]!.restUntilTurn).toBe(0);
+
+    // 手番を まわして じぶんの ターンに もどす
+    state = apply(
+      state,
+      { type: 'next' },
+      { type: 'next' }, // p2 の ターン
+      { type: 'selectAttacker', index: 0 },
+      { type: 'selectTarget', index: 0 },
+      { type: 'chooseMove', move: 'normal' },
+      { type: 'stopTiming', position: 0.5 },
+      { type: 'next' },
+      { type: 'next' },
+      { type: 'next' }, // p1 の ターン
+    );
+    expect(state.turnPlayer).toBe('p1');
+    expect(state.phase).toBe('selectAttacker');
+
+    // やすみ中の子は えらべない
+    expect(battleReducer(state, { type: 'selectAttacker', index: 0 }).phase).toBe('selectAttacker');
+    // なかまは えらべる
+    expect(battleReducer(state, { type: 'selectAttacker', index: 1 }).phase).toBe('selectTarget');
+  });
+
+  it('テラスタル していない子は なんターンでも つづけて こうげき できる', () => {
+    let state = start();
+    const before = state.turnCount;
+    state = apply(
+      state,
+      { type: 'selectAttacker', index: 0 },
+      { type: 'selectTarget', index: 0 },
+      { type: 'chooseMove', move: 'normal' },
+      { type: 'stopTiming', position: 0.5 },
+      { type: 'next' },
+    );
+    expect(state.teams.p1[0]!.restUntilTurn).toBe(0);
+    expect(canAttack(state.teams.p1[0]!, before + 2)).toBe(true);
+  });
+
+  it('1vs1 で みんな やすみ中 なら、その ターンは とばす', () => {
+    let state = createBattle(
+      [makePick({ energy: 900 })],
+      [makePick({ energy: 900 })],
+      'p1',
+      teraSettings,
+    );
+    state = apply(state, { type: 'openTeraPrompt' }, { type: 'terastallize', index: 0 }, { type: 'next' });
+    state = apply(
+      state,
+      { type: 'selectAttacker', index: 0 },
+      { type: 'selectTarget', index: 0 },
+      { type: 'chooseMove', move: 'normal' },
+      { type: 'stopTiming', position: 0.5 },
+      { type: 'next' },
+      { type: 'next' },
+      { type: 'next' }, // p2 の ターン
+      { type: 'selectAttacker', index: 0 },
+      { type: 'selectTarget', index: 0 },
+      { type: 'chooseMove', move: 'normal' },
+      { type: 'stopTiming', position: 0.5 },
+      { type: 'next' },
+      { type: 'next' },
+      { type: 'next' }, // p1 の ターン。1体しか いないので やすみ
+    );
+    expect(state.turnPlayer).toBe('p1');
+    expect(state.phase).toBe('restSkip');
+
+    // つぎへ で 手番を わたす
+    state = apply(state, { type: 'next' });
+    expect(state.phase).toBe('handOff');
+
+    // そのつぎの じぶんの ターンでは また こうげき できる
+    state = apply(
+      state,
+      { type: 'next' }, // p2 の ターン
+      { type: 'selectAttacker', index: 0 },
+      { type: 'selectTarget', index: 0 },
+      { type: 'chooseMove', move: 'normal' },
+      { type: 'stopTiming', position: 0.5 },
+      { type: 'next' },
+      { type: 'next' },
+      { type: 'next' }, // p1 の ターン
+    );
+    expect(state.turnPlayer).toBe('p1');
+    expect(state.phase).toBe('selectAttacker');
+  });
+
+  it('サイコロ方式では 💎 ボタンを 出さない', () => {
     const diceState = apply(
       createBattle([makePick()], [makePick({ energy: 900 })], 'p1', makeSettings({ attackStyle: 'dice' })),
       { type: 'selectAttacker', index: 0 },
@@ -714,7 +832,8 @@ describe('テラスタル（docs/SPEC.md §3.11）', () => {
       { type: 'next' },
       { type: 'next' },
     );
-    expect(diceState.phase).not.toBe('teraPrompt');
+    expect(diceState.teraOffer).toBe(false);
+    expect(battleReducer(diceState, { type: 'openTeraPrompt' }).phase).not.toBe('teraPrompt');
   });
 });
 
