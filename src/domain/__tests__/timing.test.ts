@@ -219,7 +219,8 @@ describe('タイミングのダメージ', () => {
 
   it('つよいわざ は ぴったり なら ふつうわざ より 大きいが、少し ずれると 負ける', () => {
     expect(hitAt('strong', 0.5)).toBeGreaterThan(hitAt('normal', 0.5));
-    expect(hitAt('strong', 0.5 + 0.15)).toBeLessThan(hitAt('normal', 0.5 + 0.15));
+    // つよいわざ は 0ダメージ帯 まで ずれると ふつうわざ に 負ける
+    expect(hitAt('strong', 0.5 + 0.25)).toBeLessThan(hitAt('normal', 0.5 + 0.25));
   });
 
   it('ばつぐん のボーナスが のる', () => {

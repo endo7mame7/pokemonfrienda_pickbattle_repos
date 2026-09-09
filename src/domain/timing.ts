@@ -24,13 +24,13 @@ export interface DamageStep {
  */
 export const MOVE_STEPS: Record<TimingMoveKind, DamageStep[]> = {
   normal: [
-    { until: 0.14, power: 200 },
-    { until: 0.28, power: 150 },
-    { until: 0.4, power: 100 },
-    { until: 0.5, power: 60 },
+    { until: 0.14, power: 100 },
+    { until: 0.28, power: 80 },
+    { until: 0.4, power: 50 },
+    { until: 0.5, power: 30 },
   ],
   strong: [
-    { until: 0.06, power: 290 },
+    { until: 0.06, power: 300 },
     { until: 0.13, power: 200 },
     { until: 0.21, power: 100 },
     { until: 0.5, power: 0 },
