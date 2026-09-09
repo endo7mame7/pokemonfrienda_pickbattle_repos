@@ -14,6 +14,8 @@ interface Props {
   gaugeSpeed: GaugeSpeed;
   /** バトルの ながさ の せってい。数字の 表示に つかう */
   battleSpeed: BattleSpeed;
+  /** テラスタル中は ゲージが うんと ゆっくりになる（§3.11） */
+  terastallized: boolean;
   onStop: (position: number) => void;
 }
 
@@ -47,10 +49,10 @@ const MIN_LABEL_PX = 22;
  * つよい わざ ほど まんなかの段が せまく、バーも はやく動く。
  */
 export function TimingGauge({
-  move, type, tired, megaEvolved, gaugeSpeed, battleSpeed, onStop,
+  move, type, tired, megaEvolved, gaugeSpeed, battleSpeed, terastallized, onStop,
 }: Props) {
   const steps = stepsFor(move, { tired, megaEvolved });
-  const cycleMs = gaugeCycleMs(gaugeSpeed, move);
+  const cycleMs = gaugeCycleMs(gaugeSpeed, move, terastallized);
   const [position, setPosition] = useState(0.5);
   const stopped = useRef(false);
   const startedAt = useRef(performance.now());
@@ -138,6 +140,7 @@ export function TimingGauge({
       <div className="gauge__hint">
         {tired && '💤 つかれてて ねらいにくい… '}
         {megaEvolved && '🌈 メガシンカで ねらいやすい！ '}
+        {terastallized && '💎 テラスタルで ゆっくり！ '}
         まんなかで タップ！
       </div>
       {move === 'strong' && (

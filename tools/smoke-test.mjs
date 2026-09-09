@@ -105,6 +105,7 @@ while (turns < 900) {
     await page.waitForTimeout(1000);
     continue;
   }
+  if (body.includes('テラスタル できる')) { await page.getByText('いまは しない').click(); continue; }
   if (body.includes('スマホを わたしてね')) { await page.getByText('じゅんび できた').click(); continue; }
   if (body.includes('ばつぐん！')) sawSuperEffective = true;
   if (body.includes('つかれて')) sawTired = true;

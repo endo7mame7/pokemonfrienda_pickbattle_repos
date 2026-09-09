@@ -58,6 +58,8 @@ export interface BattlePokemon {
   megaEvolved: boolean;
   /** メガわざ を つかって ちからを つかいきった。もう メガシンカ できない */
   megaUsed: boolean;
+  /** テラスタル中。ゲージが うんと ゆっくりになり、テラスタルわざ が つかえる（§3.11） */
+  terastallized: boolean;
   /** 全力で攻撃した次のターン。ダメージが半分になる */
   tired: boolean;
   /** MVP 判定に使う累計与ダメージ */

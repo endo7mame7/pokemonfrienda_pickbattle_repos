@@ -15,7 +15,8 @@
     "preview:effects": "node tools/effect-preview.mjs",
     "check:timing": "node tools/timing-check.mjs",
     "check:mega": "node tools/mega-check.mjs",
-    "check:gauge": "node tools/gauge-speed-check.mjs"
+    "check:gauge": "node tools/gauge-speed-check.mjs",
+    "check:tera": "node tools/tera-check.mjs"
   },
   "dependencies": {
     "dexie": "^4.0.10",

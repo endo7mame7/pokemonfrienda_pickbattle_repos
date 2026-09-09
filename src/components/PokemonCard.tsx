@@ -40,6 +40,7 @@ export function PokemonCard({
     fainted && 'card--fainted',
     pokemon.tired && !fainted && 'card--tired',
     pokemon.megaEvolved && !fainted && 'card--mega',
+    pokemon.terastallized && !fainted && 'card--tera',
     hit && 'card--hit',
   ]
     .filter(Boolean)
@@ -64,6 +65,7 @@ export function PokemonCard({
         <div className="card__marks">
           {fainted && '✕'}
           {!fainted && pokemon.megaEvolved && '🌈'}
+          {!fainted && pokemon.terastallized && '💎'}
           {!fainted && pokemon.tired && '💤'}
         </div>
         <Silhouette
@@ -71,6 +73,7 @@ export function PokemonCard({
           type={pokemon.type}
           shape={pokemon.silhouette}
           mega={pokemon.megaEvolved}
+          tera={pokemon.terastallized}
           size={40}
         />
         <div className="card__name">{pokemon.name}</div>

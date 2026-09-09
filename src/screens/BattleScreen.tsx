@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useReducer, useRef, useState } from 'react'
 import { AttackAnimation } from '../components/AttackAnimation';
 import { MegaEndEffect } from '../components/MegaEndEffect';
 import { MegaEvolveCutIn } from '../components/MegaEvolveCutIn';
+import { TeraCutIn } from '../components/TeraCutIn';
 import { MashGauge } from '../components/MashGauge';
 import { TimingGauge } from '../components/TimingGauge';
 import type { AttackPath } from '../components/AttackAnimation';
@@ -33,9 +34,10 @@ interface Props {
 
 const ROLL_ANIMATION_MS = 700;
 const MEGA_ANIMATION_MS = 2400;
+const TERA_ANIMATION_MS = 2300;
 
 /** カットインの ながさ。つよい わざ ほど ためて 見せる */
-const CUT_IN_MS: Record<MoveKind, number> = { normal: 700, strong: 900, mega: 1300 };
+const CUT_IN_MS: Record<MoveKind, number> = { normal: 700, strong: 900, mega: 1300, tera: 1300 };
 /** 飛んでいって 当たって、はじけ終わるまで */
 const STRIKE_MS = 1350;
 
@@ -53,6 +55,8 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
   const bodyRef = useRef<HTMLDivElement>(null);
   // 攻撃エフェクトを、こうげきする子から ねらわれた子へ飛ばすための位置
   const [path, setPath] = useState<AttackPath | null>(null);
+  /** あたった あいて ごとの ダメージの 出しどころ（テラスタルわざ 用） */
+  const [hitPaths, setHitPaths] = useState<Array<{ path: AttackPath; damage: number }>>([]);
   // つかれている子を選んだときの「それでも いい？」確認（docs/SPEC.md §3.7）
   const [tiredConfirmIndex, setTiredConfirmIndex] = useState<number | null>(null);
 
@@ -81,13 +85,19 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
     const from = center(`${state.turnPlayer}-${state.selectedAttackerIndex}`);
     const to = center(`${OPPONENT_OF[state.turnPlayer]}-${result.targetIndex}`);
     if (from && to) {
-      setPath({
-        fromX: from.x,
-        fromY: from.y,
-        toX: to.x,
-        toY: to.y,
-        areaWidth: body.getBoundingClientRect().width,
-      });
+      const areaWidth = body.getBoundingClientRect().width;
+      setPath({ fromX: from.x, fromY: from.y, toX: to.x, toY: to.y, areaWidth });
+      // テラスタルわざ は 何人にも あたるので、それぞれの いち も はかっておく
+      setHitPaths(
+        result.hits.flatMap((hit) => {
+          const at = center(`${OPPONENT_OF[state.turnPlayer]}-${hit.targetIndex}`);
+          if (!at) return [];
+          return [{
+            path: { fromX: from.x, fromY: from.y, toX: at.x, toY: at.y, areaWidth },
+            damage: hit.damage,
+          }];
+        }),
+      );
     }
   }, [state.phase, state.lastResult, state.selectedAttackerIndex, state.turnPlayer]);
 
@@ -113,6 +123,12 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
     return () => window.clearTimeout(timer);
   }, [state.phase]);
 
+  useEffect(() => {
+    if (state.phase !== 'teraChanging') return undefined;
+    const timer = window.setTimeout(() => dispatch({ type: 'next' }), TERA_ANIMATION_MS);
+    return () => window.clearTimeout(timer);
+  }, [state.phase]);
+
   const attackerSide = state.turnPlayer;
   const targetSide = OPPONENT_OF[state.turnPlayer];
   const result = state.lastResult;
@@ -124,6 +140,8 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
     state.megaCandidateIndex === null
       ? null
       : (state.teams[attackerSide][state.megaCandidateIndex] ?? null);
+  // テラスタル の演出に出す子。いま テラスタル している子
+  const teraPokemon = state.teams[attackerSide].find((pokemon) => pokemon.terastallized) ?? null;
 
   const chooseAttacker = (index: number) => {
     const pokemon = state.teams[attackerSide][index];
@@ -200,11 +218,11 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
             }
             dimmed={dimmed}
             hit={
-              state.phase === 'attacking' &&
-              result &&
-              side === targetSide &&
-              result.targetIndex === index
-                ? { damage: result.damage }
+              state.phase === 'attacking' && result && side === targetSide
+                ? (() => {
+                    const struck = result.hits.find((one) => one.targetIndex === index);
+                    return struck ? { damage: struck.damage } : undefined;
+                  })()
                 : undefined
             }
             onSelect={() =>
@@ -255,23 +273,36 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
                   >
                     {MOVE_NAMES[attackerPokemon.type][move]}
                     <span className="move-btn__sub">
-                      {move === 'normal' ? 'あてやすい' : 'つよい！ ゲージも はやい'}
+                      {move === 'normal' ? 'あてやすい' : 'つよい！ はやい'}
                     </span>
                   </button>
                 ))}
               </div>
-              {/* メガシンカ中だけ つかえる れんだ わざ */}
-              {attackerPokemon.megaEvolved && (
-                <button
-                  type="button"
-                  className="move-btn move-btn--mega"
-                  onClick={() => dispatch({ type: 'chooseMove', move: 'mega' })}
-                >
-                  🌈 {MOVE_NAMES[attackerPokemon.type].mega}
-                  <span className="move-btn__sub">
-                    れんだ するだけ！ でも メガシンカ は おわる
-                  </span>
-                </button>
+              {/* メガシンカ・テラスタル中だけ つかえる せんよう わざ。
+                  両方 のときは よこに ならべて 高さを おさえる */}
+              {(attackerPokemon.terastallized || attackerPokemon.megaEvolved) && (
+                <div className="move-row">
+                  {attackerPokemon.terastallized && (
+                    <button
+                      type="button"
+                      className="move-btn move-btn--special move-btn--tera"
+                      onClick={() => dispatch({ type: 'chooseMove', move: 'tera' })}
+                    >
+                      💎 {MOVE_NAMES[attackerPokemon.type].tera}
+                      <span className="move-btn__sub">ぜんいんに</span>
+                    </button>
+                  )}
+                  {attackerPokemon.megaEvolved && (
+                    <button
+                      type="button"
+                      className="move-btn move-btn--special move-btn--mega"
+                      onClick={() => dispatch({ type: 'chooseMove', move: 'mega' })}
+                    >
+                      🌈 {MOVE_NAMES[attackerPokemon.type].mega}
+                      <span className="move-btn__sub">れんだ・1かい</span>
+                    </button>
+                  )}
+                </div>
               )}
             </>
           )}
@@ -292,6 +323,7 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
               megaEvolved={attackerPokemon.megaEvolved}
               gaugeSpeed={settings.gaugeSpeed}
               battleSpeed={settings.battleSpeed}
+              terastallized={attackerPokemon.terastallized}
               onStop={(position) => dispatch({ type: 'stopTiming', position })}
             />
           )}
@@ -357,7 +389,7 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
             state.selectedAttackerIndex !== null && (
               <button
                 type="button"
-                className="btn btn--ghost"
+                className="btn btn--ghost btn--compact"
                 onClick={() => dispatch({ type: 'clearSelection' })}
               >
                 えらびなおす
@@ -381,6 +413,7 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
             moveName={result.moveName}
             moveKind={result.moveKind}
             damage={result.damage}
+            damageHits={hitPaths.length > 1 ? hitPaths : undefined}
             isSuperEffective={result.isSuperEffective}
             stage={state.phase === 'resolve' ? 'damage' : stage}
           />
@@ -454,6 +487,59 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
               いまは しない
             </button>
           </div>
+        </div>
+      )}
+
+      {state.phase === 'teraPrompt' && (
+        <div className="overlay">
+          <div className="overlay__panel">
+            <div style={{ fontSize: 44 }}>💎</div>
+            <div className="overlay__title" style={{ fontSize: 22 }}>
+              テラスタル できる！
+            </div>
+            <p style={{ margin: 0 }}>
+              ゲージが うんと ゆっくりに なって、あいて ぜんいん に あたる
+              <strong>テラスタルわざ</strong> が つかえるよ。バトルで 1回だけ！
+            </p>
+            <div className="tera-pick">
+              {state.teams[attackerSide].map((pokemon, index) =>
+                isAlive(pokemon) ? (
+                  <button
+                    key={pokemon.pickId + index}
+                    type="button"
+                    className="tera-pick__btn"
+                    onClick={() => dispatch({ type: 'terastallize', index })}
+                  >
+                    <Silhouette
+                      name={pokemon.name}
+                      type={pokemon.type}
+                      shape={pokemon.silhouette}
+                      size={44}
+                    />
+                    <span>{pokemon.name}</span>
+                  </button>
+                ) : null,
+              )}
+            </div>
+            <button
+              type="button"
+              className="btn btn--ghost"
+              onClick={() => dispatch({ type: 'declineTera' })}
+            >
+              いまは しない
+            </button>
+          </div>
+        </div>
+      )}
+
+      {state.phase === 'teraChanging' && teraPokemon && (
+        <div className="overlay">
+          <TeraCutIn
+            key={`tera-cutin-${state.turnCount}-${teraPokemon.pickId}`}
+            name={teraPokemon.name}
+            type={teraPokemon.type}
+            shape={teraPokemon.silhouette}
+          />
         </div>
       )}
 

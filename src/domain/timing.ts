@@ -35,6 +35,19 @@ export const MOVE_STEPS: Record<TimingMoveKind, DamageStep[]> = {
     { until: 0.21, power: 100 },
     { until: 0.5, power: 0 },
   ],
+  /**
+   * テラスタルわざ（§3.11）。ここの ちから は **あいて ぜんいん ぶんの 合計**で、
+   * いきている あいて の 数で 等分してから 1体ずつに 当てる。
+   * あいてが 1体のときは 1.5 で わる（＝つよいわざ と おなじ）ので、
+   * 「ちらすより 1体に あつめたほうが 大きい」が いつでも なりたつ。
+   * テラスタル中は ゲージが うんと ゆっくり なので、ねらいやすい。
+   */
+  tera: [
+    { until: 0.06, power: 450 },
+    { until: 0.13, power: 300 },
+    { until: 0.21, power: 150 },
+    { until: 0.5, power: 0 },
+  ],
 };
 
 /** つかれていると 段が せまくなる（＝ねらいにくい・docs/SPEC.md §3.7） */
@@ -47,6 +60,9 @@ export interface TimingModifiers {
   tired?: boolean;
   megaEvolved?: boolean;
 }
+
+/** テラスタル中は ゲージが この ばいすう だけ ゆっくりになる（§3.11） */
+export const TERA_GAUGE_SCALE = 2.2;
 
 /**
  * いまの じょうたい での 段。
@@ -126,8 +142,19 @@ export const GAUGE_SPEED_SCALE: Record<GaugeSpeed, number> = {
 export const MOVE_GAUGE_SCALE: Record<TimingMoveKind, number> = {
   normal: 1,
   strong: 0.7,
+  /** テラスタルわざ は ふつうわざ と おなじ はやさ（テラスタルの ばいすう が さらに かかる） */
+  tera: 1,
 };
 
-export function gaugeCycleMs(speed: GaugeSpeed, kind: TimingMoveKind): number {
-  return Math.round(GAUGE_BASE_CYCLE_MS * GAUGE_SPEED_SCALE[speed] * MOVE_GAUGE_SCALE[kind]);
+export function gaugeCycleMs(
+  speed: GaugeSpeed,
+  kind: TimingMoveKind,
+  terastallized = false,
+): number {
+  return Math.round(
+    GAUGE_BASE_CYCLE_MS *
+      GAUGE_SPEED_SCALE[speed] *
+      MOVE_GAUGE_SCALE[kind] *
+      (terastallized ? TERA_GAUGE_SCALE : 1),
+  );
 }

@@ -68,6 +68,7 @@ async function measure(moveIndex) {
 
   for (let i = 0; i < 200; i += 1) {
     const body = await page.locator('body').innerText();
+    if (body.includes('テラスタル できる')) { await page.getByText('いまは しない').click(); continue; }
     if (body.includes('スマホを わたしてね')) { await page.getByText('じゅんび できた').click(); continue; }
     if (body.includes('だれで こうげきする')) {
       await page.locator('[data-role=attacker] .card--selectable').first().click({ force: true });

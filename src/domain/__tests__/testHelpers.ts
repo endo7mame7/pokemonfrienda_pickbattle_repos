@@ -29,6 +29,7 @@ export function makePokemon(overrides: Partial<BattlePokemon> = {}): BattlePokem
     canMegaEvolve: false,
     megaEvolved: false,
     megaUsed: false,
+    terastallized: false,
     tired: false,
     damageDealt: 0,
     ...overrides,
