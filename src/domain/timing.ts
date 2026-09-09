@@ -35,19 +35,6 @@ export const MOVE_STEPS: Record<TimingMoveKind, DamageStep[]> = {
     { until: 0.21, power: 100 },
     { until: 0.5, power: 0 },
   ],
-  /**
-   * テラスタルわざ（§3.11）。ここの ちから は **あいて ぜんいん ぶんの 合計**で、
-   * いきている あいて の 数で 等分してから 1体ずつに 当てる。
-   * あいてが 1体のときは 1.5 で わる（＝つよいわざ と おなじ）ので、
-   * 「ちらすより 1体に あつめたほうが 大きい」が いつでも なりたつ。
-   * テラスタル中は ゲージが うんと ゆっくり なので、ねらいやすい。
-   */
-  tera: [
-    { until: 0.06, power: 450 },
-    { until: 0.13, power: 300 },
-    { until: 0.21, power: 150 },
-    { until: 0.5, power: 0 },
-  ],
 };
 
 /** つかれていると 段が せまくなる（＝ねらいにくい・docs/SPEC.md §3.7） */
@@ -142,8 +129,6 @@ export const GAUGE_SPEED_SCALE: Record<GaugeSpeed, number> = {
 export const MOVE_GAUGE_SCALE: Record<TimingMoveKind, number> = {
   normal: 1,
   strong: 0.7,
-  /** テラスタルわざ は ふつうわざ と おなじ はやさ（テラスタルの ばいすう が さらに かかる） */
-  tera: 1,
 };
 
 export function gaugeCycleMs(

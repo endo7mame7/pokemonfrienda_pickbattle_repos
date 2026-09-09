@@ -1,6 +1,6 @@
 import { calcDamage } from './damage';
 import type { AttackInput } from './damage';
-import { moveName } from './moves';
+import { MOVE_POWER, moveName } from './moves';
 import type { MoveKind } from './moves';
 import { judgeStep, stepIndexAt, stepPowerAt } from './timing';
 import type { TimingResult } from './timing';
@@ -29,6 +29,8 @@ export type BattlePhase =
   | 'timing'
   /** ボタンを連打してゲージをためる（メガわざのとき） */
   | 'mashing'
+  /** ちらばった けっしょう を タップする（テラスタルわざのとき） */
+  | 'tapping'
   | 'rollDice'
   /** サイコロは出たが、まだ当たっていない。攻撃エフェクトを見せる */
   | 'attacking'
@@ -63,6 +65,8 @@ export interface TurnResult {
   timing?: TimingResult;
   /** メガわざのときだけ。ゲージの たまりぐあい（0〜1） */
   mashFill?: number;
+  /** テラスタルわざのときだけ。けっしょう を とれた わりあい（0〜1） */
+  tapFill?: number;
   /** えらんだ あいて に あたえた ダメージ。テラスタルわざ では 1体ぶん */
   damage: number;
   isSuperEffective: boolean;
@@ -118,6 +122,8 @@ export type BattleAction =
   | { type: 'stopTiming'; position: number }
   /** メガわざの連打がおわった。fill は 0〜1 */
   | { type: 'finishMash'; fill: number }
+  /** テラスタルわざ の けっしょうタップ が おわった。fill は 0〜1 */
+  | { type: 'finishTap'; fill: number }
   | { type: 'rollDice'; rolls: number[] }
   /** 結果の演出が終わった／受け渡し画面を閉じた */
   | { type: 'next' };
@@ -222,7 +228,13 @@ function resolveAttack(state: BattleState, input: AttackInput): BattleState {
   if (!attacker || !target) return state;
 
   const kind: MoveKind =
-    input.style === 'timing' ? input.move : input.style === 'mash' ? 'mega' : 'normal';
+    input.style === 'timing'
+      ? input.move
+      : input.style === 'mash'
+        ? 'mega'
+        : input.style === 'tap'
+          ? 'tera'
+          : 'normal';
 
   // テラスタルわざ は いきている あいて ぜんいん に あたる。ちからは 等分（§3.11）
   const spread = kind === 'tera';
@@ -237,7 +249,9 @@ function resolveAttack(state: BattleState, input: AttackInput): BattleState {
    */
   const share = spread && hitIndexes.length > 0 ? Math.max(hitIndexes.length, 1.5) : 1;
   const shared: AttackInput =
-    input.style === 'timing' ? { ...input, power: input.power / share } : input;
+    input.style === 'timing' || input.style === 'tap'
+      ? { ...input, power: input.power / share }
+      : input;
 
   const hits: Hit[] = hitIndexes.flatMap((index) => {
     const defender = defenders[index];
@@ -261,6 +275,7 @@ function resolveAttack(state: BattleState, input: AttackInput): BattleState {
       ...(input.style === 'dice' ? { rolls: input.rolls } : {}),
       ...(input.style === 'timing' ? { timing: input.timing } : {}),
       ...(input.style === 'mash' ? { mashFill: input.fill } : {}),
+      ...(input.style === 'tap' ? { tapFill: input.fill } : {}),
       damage: main?.damage ?? 0,
       isSuperEffective: main?.isSuperEffective ?? false,
       isTired,
@@ -402,11 +417,10 @@ export function battleReducer(state: BattleState, action: BattleAction): BattleS
       // メガわざは メガシンカ中の子だけ、テラスタルわざ は テラスタル中の子だけ
       if (action.move === 'mega' && !attacker?.megaEvolved) return state;
       if (action.move === 'tera' && !attacker?.terastallized) return state;
-      return {
-        ...state,
-        phase: action.move === 'mega' ? 'mashing' : 'timing',
-        selectedMove: action.move,
-      };
+      // わざ ごとに だしかた が ちがう（ゲージ／連打／けっしょうタップ）
+      const phase: BattlePhase =
+        action.move === 'mega' ? 'mashing' : action.move === 'tera' ? 'tapping' : 'timing';
+      return { ...state, phase, selectedMove: action.move };
     }
 
     case 'finishMash': {
@@ -414,8 +428,23 @@ export function battleReducer(state: BattleState, action: BattleAction): BattleS
       return resolveAttack(state, { style: 'mash', fill: action.fill });
     }
 
+    case 'finishTap': {
+      if (state.phase !== 'tapping') return state;
+      // とれた わりあい が そのまま ちから になる（ぜんぶ とれば MOVE_POWER.tera）
+      return resolveAttack(state, {
+        style: 'tap',
+        power: MOVE_POWER.tera * action.fill,
+        fill: action.fill,
+      });
+    }
+
     case 'stopTiming': {
-      if (state.phase !== 'timing' || state.selectedMove === null || state.selectedMove === 'mega') {
+      if (
+        state.phase !== 'timing' ||
+        state.selectedMove === null ||
+        state.selectedMove === 'mega' ||
+        state.selectedMove === 'tera'
+      ) {
         return state;
       }
       const attacker =

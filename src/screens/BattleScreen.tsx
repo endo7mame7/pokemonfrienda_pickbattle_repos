@@ -4,6 +4,7 @@ import { MegaEndEffect } from '../components/MegaEndEffect';
 import { MegaEvolveCutIn } from '../components/MegaEvolveCutIn';
 import { TeraCutIn } from '../components/TeraCutIn';
 import { MashGauge } from '../components/MashGauge';
+import { CrystalTap } from '../components/CrystalTap';
 import { TimingGauge } from '../components/TimingGauge';
 import type { AttackPath } from '../components/AttackAnimation';
 import { Dice } from '../components/Dice';
@@ -180,6 +181,8 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
         return attackerPokemon && settings.fatigueEnabled && attackerPokemon.tired
           ? '💤 つかれてる… もっと れんだ！'
           : 'ボタンを れんだ！';
+      case 'tapping':
+        return '💎 けっしょうを ぜんぶ タップ！';
       case 'attacking':
         return stage === 'cutIn' ? '' : `${result?.attackerName}の ${result?.moveName}！`;
       case 'resolve':
@@ -319,7 +322,11 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
             />
           )}
 
-          {state.phase === 'timing' && state.selectedMove && state.selectedMove !== 'mega' && attackerPokemon && (
+          {state.phase === 'timing' &&
+            state.selectedMove &&
+            state.selectedMove !== 'mega' &&
+            state.selectedMove !== 'tera' &&
+            attackerPokemon && (
             <TimingGauge
               move={state.selectedMove}
               type={attackerPokemon.type}
@@ -356,6 +363,17 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
                   {result.mashFill >= 1
                     ? '🌈 MAX！ さいきょう'
                     : `🌈 ゲージ ${Math.round(result.mashFill * 100)}%`}
+                </div>
+              )}
+              {result.tapFill !== undefined && (
+                <div
+                  className={`timing-result timing-result--${
+                    result.tapFill >= 1 ? 'perfect' : result.tapFill >= 0.5 ? 'near' : 'miss'
+                  }`}
+                >
+                  {result.tapFill >= 1
+                    ? '💎 ぜんぶ とれた！ さいきょう'
+                    : `💎 けっしょう ${Math.round(result.tapFill * 100)}%`}
                 </div>
               )}
               {result.timing && (
@@ -431,6 +449,16 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
             damageHits={hitPaths.length > 1 ? hitPaths : undefined}
             isSuperEffective={result.isSuperEffective}
             stage={state.phase === 'resolve' ? 'damage' : stage}
+          />
+        )}
+
+        {/* テラスタルわざ。バトル画面ぜんたい に ちらばった けっしょう を タップする */}
+        {state.phase === 'tapping' && attackerPokemon && (
+          <CrystalTap
+            key={`tap-${state.turnCount}`}
+            type={attackerPokemon.type}
+            tired={settings.fatigueEnabled && attackerPokemon.tired}
+            onFinish={(fill) => dispatch({ type: 'finishTap', fill })}
           />
         )}
 

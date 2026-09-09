@@ -632,7 +632,8 @@ describe('テラスタル（docs/SPEC.md §3.11）', () => {
       { type: 'selectTarget', index: 0 },
       { type: 'chooseMove', move: 'tera' },
     );
-    expect(self.phase).toBe('timing');
+    // テラスタルわざ は ゲージではなく けっしょうタップ（§3.11）
+    expect(self.phase).toBe('tapping');
   });
 
   it('テラスタルわざ は あいて ぜんいん に あたり、ダメージは 等分', () => {
@@ -645,10 +646,11 @@ describe('テラスタル（docs/SPEC.md §3.11）', () => {
       { type: 'selectAttacker', index: 0 },
       { type: 'selectTarget', index: 1 },
       { type: 'chooseMove', move: 'tera' },
-      { type: 'stopTiming', position: 0.5 },
+      { type: 'finishTap', fill: 1 }, // けっしょう を ぜんぶ とった
       { type: 'next' },
     );
     const result = state.lastResult!;
+    expect(result.tapFill).toBe(1);
     expect(result.hits).toHaveLength(3);
     expect(new Set(result.hits.map((hit) => hit.targetIndex))).toEqual(new Set([0, 1, 2]));
     // 3体に とうぶん。1体あたり 450 ÷ 3 = 150
@@ -672,7 +674,7 @@ describe('テラスタル（docs/SPEC.md §3.11）', () => {
       { type: 'selectAttacker', index: 0 },
       { type: 'selectTarget', index: 0 },
       { type: 'chooseMove', move: 'tera' },
-      { type: 'stopTiming', position: 0.5 },
+      { type: 'finishTap', fill: 1 },
       { type: 'next' },
     );
     expect(state.lastResult!.hits).toHaveLength(1);
@@ -715,6 +717,45 @@ describe('テラスタル（docs/SPEC.md §3.11）', () => {
     expect(state.teams.p1[0]!.megaEvolved).toBe(false);
     // メガシンカ の フラグ は テラスタル で 変わらない
     expect(state.teraUsed.p1).toBe(true);
+  });
+
+  it('とれた けっしょう の 数で ちから が きまる', () => {
+    const damageFor = (fill: number) => {
+      let state = start();
+      state = apply(
+        state,
+        { type: 'openTeraPrompt' },
+        { type: 'terastallize', index: 0 },
+        { type: 'next' },
+        { type: 'selectAttacker', index: 0 },
+        { type: 'selectTarget', index: 0 },
+        { type: 'chooseMove', move: 'tera' },
+        { type: 'finishTap', fill },
+        { type: 'next' },
+      );
+      return state.lastResult!.hits.reduce((sum, hit) => sum + hit.damage, 0);
+    };
+    // ぜんぶ とれば 450（3体に 150ずつ）、はんぶん なら その はんぶん
+    expect(damageFor(1)).toBe(450);
+    expect(damageFor(0.5)).toBe(240); // 75 → 10の倍数に切り上げて 80 が 3体
+    expect(damageFor(1)).toBeGreaterThan(damageFor(0.5));
+    expect(damageFor(0.5)).toBeGreaterThan(damageFor(0));
+  });
+
+  it('けっしょう が 1つも とれないと 0ダメージ', () => {
+    let state = start();
+    state = apply(
+      state,
+      { type: 'openTeraPrompt' },
+      { type: 'terastallize', index: 0 },
+      { type: 'next' },
+      { type: 'selectAttacker', index: 0 },
+      { type: 'selectTarget', index: 0 },
+      { type: 'chooseMove', move: 'tera' },
+      { type: 'finishTap', fill: 0 },
+      { type: 'next' },
+    );
+    for (const hit of state.lastResult!.hits) expect(hit.damage).toBe(0);
   });
 
   it('テラスタル中の子は こうげきした つぎの じぶんの ターンは やすみ', () => {
