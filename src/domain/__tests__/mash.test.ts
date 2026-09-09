@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { calcDamage } from '../damage';
 import { MASH_BASE_TAPS, mashFill, mashMultiplier, mashTargetTaps } from '../mash';
-import { MOVE_NAMES } from '../moves';
+import { MOVE_NAMES, MOVE_POWER } from '../moves';
 import { POKEMON_TYPES } from '../types';
 import { makePokemon, makeSettings } from './testHelpers';
 
@@ -59,7 +59,7 @@ describe('メガわざ の 名前と ダメージ', () => {
     const strongPerfect = calcDamage(
       mega,
       target,
-      { style: 'timing', move: 'strong', ratio: 1, timing: 'perfect' },
+      { style: 'timing', move: 'strong', power: MOVE_POWER.strong, timing: 'perfect' },
       settings,
     ).damage;
     expect(megaHit(1)).toBeLessThan(strongPerfect);

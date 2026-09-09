@@ -1,4 +1,4 @@
-import { movePower } from './moves';
+import { SPEED_POWER_SCALE, movePower } from './moves';
 import type { TimingMoveKind } from './moves';
 import { mashMultiplier } from './mash';
 import type { TimingResult } from './timing';
@@ -23,8 +23,8 @@ export interface DamageResult {
 /** サイコロの出目か、わざ＋タイミングか。どちらで攻撃したか */
 export type AttackInput =
   | { style: 'dice'; rolls: number[] }
-  /** ratio は ちから の わりあい（0〜1）。timing は 見せかたの ラベル */
-  | { style: 'timing'; move: TimingMoveKind; ratio: number; timing: TimingResult }
+  /** power は とめた段の ちから。timing は 見せかたの ラベル */
+  | { style: 'timing'; move: TimingMoveKind; power: number; timing: TimingResult }
   /** メガわざ。fill は ゲージの たまりぐあい（0〜1） */
   | { style: 'mash'; fill: number };
 
@@ -49,7 +49,7 @@ export function calcDamage(
   if (input.style === 'dice') {
     damage = input.rolls.reduce((sum, roll) => sum + roll, 0) * settings.damageMultiplier;
   } else if (input.style === 'timing') {
-    damage = movePower(input.move, settings.battleSpeed) * input.ratio * megaBoost;
+    damage = input.power * SPEED_POWER_SCALE[settings.battleSpeed] * megaBoost;
   } else {
     damage = movePower('mega', settings.battleSpeed) * mashMultiplier(input.fill) * megaBoost;
   }

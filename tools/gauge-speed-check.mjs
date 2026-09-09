@@ -47,7 +47,13 @@ async function setGaugeSpeed(label) {
   return on.some((text) => text.startsWith(label));
 }
 
-/** 1vs1 を はじめて、ゲージの マーカーが 1フレームで 何px 動くか はかる */
+/**
+ * 1vs1 を はじめて、ゲージが 左右を 1往復する じかん（ms）を はかる。
+ *
+ * ページの そとから 一定かんかくで 見にいくと、はやいときに 見のがして
+ * （エイリアシング）数字が あばれる。requestAnimationFrame で
+ * ページの中から まとめて とって、おりかえし の あいだ を かぞえる。
+ */
 async function measure(moveIndex) {
   await page.locator('.mode').first().click();
   await page.getByText('1たい1').click();
@@ -73,17 +79,35 @@ async function measure(moveIndex) {
     }
     if (body.includes('どの わざに する')) { await page.locator('.move-btn').nth(moveIndex).click(); continue; }
     if (body.includes('まんなかで とめよう')) {
-      const samples = [];
-      for (let t = 0; t < 30; t += 1) {
-        samples.push(
-          await page.evaluate(() =>
-            parseFloat(getComputedStyle(document.querySelector('.gauge__marker')).left)),
-        );
-        await page.waitForTimeout(30);
+      const samples = await page.evaluate(
+        (ms) =>
+          new Promise((resolve) => {
+            const marker = document.querySelector('.gauge__marker');
+            const out = [];
+            const start = performance.now();
+            const tick = () => {
+              const now = performance.now() - start;
+              out.push([now, parseFloat(getComputedStyle(marker).left)]);
+              if (now < ms) requestAnimationFrame(tick);
+              else resolve(out);
+            };
+            requestAnimationFrame(tick);
+          }),
+        3000,
+      );
+      // おりかえし（うごく むきが 変わる ところ）を さがす
+      const turns = [];
+      for (let t = 1; t < samples.length - 1; t += 1) {
+        const before = samples[t][1] - samples[t - 1][1];
+        const after = samples[t + 1][1] - samples[t][1];
+        if (before !== 0 && after !== 0 && Math.sign(before) !== Math.sign(after)) {
+          turns.push(samples[t][0]);
+        }
       }
-      let moved = 0;
-      for (let t = 1; t < samples.length; t += 1) moved += Math.abs(samples[t] - samples[t - 1]);
-      return moved / (samples.length - 1);
+      if (turns.length < 3) return null;
+      // おりかえし から おりかえし までが 半おうふく
+      const half = (turns[turns.length - 1] - turns[0]) / (turns.length - 1);
+      return Math.round(half * 2);
     }
     await page.waitForTimeout(50);
   }
@@ -105,14 +129,15 @@ const chipOnFast = await setGaugeSpeed('はやめ');
 const normalAtFast = await measure(0);
 await restart();
 
+// 1往復の じかん（ms）。みじかいほど はやい
 const summary = {
   chipOnNormal,
   chipOnFast,
   'ふつうわざ・ふつう': normalAtNormal,
   'つよいわざ・ふつう': strongAtNormal,
   'ふつうわざ・はやめ': normalAtFast,
-  'つよい / ふつう': strongAtNormal / normalAtNormal,
-  'はやめ / ふつう': normalAtFast / normalAtNormal,
+  'つよい ÷ ふつう': strongAtNormal / normalAtNormal,
+  'はやめ ÷ ふつう': normalAtFast / normalAtNormal,
   errors,
 };
 console.log(JSON.stringify(summary, null, 2));
@@ -120,10 +145,11 @@ await browser.close();
 
 const ok =
   chipOnNormal && chipOnFast &&
-  // つよいわざ は ゲージが はやい
-  strongAtNormal > normalAtNormal * 1.15 &&
+  normalAtNormal !== null && strongAtNormal !== null && normalAtFast !== null &&
+  // つよいわざ は ゲージが はやい（1往復の じかん が みじかい）
+  strongAtNormal < normalAtNormal * 0.85 &&
   // せってい「はやめ」で ゲージが はやくなる
-  normalAtFast > normalAtNormal * 1.15 &&
+  normalAtFast < normalAtNormal * 0.85 &&
   errors.length === 0;
 
 if (!ok) {
