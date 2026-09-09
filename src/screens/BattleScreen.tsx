@@ -382,6 +382,17 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
             </>
           )}
 
+          {/* テラスタル は 毎ターン 聞かず、つかいたいときに おす（§3.11） */}
+          {state.phase === 'selectAttacker' && state.teraOffer && !rolling && (
+            <button
+              type="button"
+              className="btn btn--compact btn--tera"
+              onClick={() => dispatch({ type: 'openTeraPrompt' })}
+            >
+              💎 テラスタル する
+            </button>
+          )}
+
           {(state.phase === 'selectAttacker' ||
             state.phase === 'selectTarget' ||
             state.phase === 'chooseMove') &&
@@ -495,7 +506,7 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
           <div className="overlay__panel">
             <div style={{ fontSize: 44 }}>💎</div>
             <div className="overlay__title" style={{ fontSize: 22 }}>
-              テラスタル できる！
+              だれを テラスタル する？
             </div>
             <p style={{ margin: 0 }}>
               ゲージが うんと ゆっくりに なって、あいて ぜんいん に あたる
@@ -526,7 +537,7 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
               className="btn btn--ghost"
               onClick={() => dispatch({ type: 'declineTera' })}
             >
-              いまは しない
+              やめる
             </button>
           </div>
         </div>

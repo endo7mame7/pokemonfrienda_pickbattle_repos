@@ -1782,6 +1782,13 @@ body {
   font-size: 11px;
 }
 
+/* テラスタル を よびだす ボタン。おさなくても すすめる */
+.btn--tera {
+  background: linear-gradient(120deg, #2bb8d8, #7b6bd8);
+  border-color: transparent;
+  color: #fff;
+}
+
 /* バトル中の「えらびなおす」。わざが 4つ ならんでも 画面に おさまるように ひくくする */
 .btn--compact {
   min-height: 40px;

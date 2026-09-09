@@ -5,7 +5,7 @@
  *   npm run check:tera
  *
  * 見るところ:
- *  - ターンのはじめに「だれを テラスタル する？」と きかれる
+ *  - 毎ターン きかれない。💎 ボタンを おしたときだけ えらぶ画面が 出る
  *  - せんよう カットイン が出て、かげ に けっしょう が つく
  *  - ゲージが うんと ゆっくりになる（1往復の じかん を はかる）
  *  - テラスタルわざ が あいて ぜんいん に あたり、ダメージが 等分される
@@ -83,7 +83,9 @@ await page.getByText('コインを なげる').click();
 await page.waitForTimeout(1500);
 await page.getByText('バトル スタート').click();
 
+let sawButton = false;
 let sawPrompt = false;
+let promptedWithoutTap = false;   // おしていないのに 出てきたら だめ
 let teraCutIn = 0;
 let teraCards = 0;
 let normalCycle = null;
@@ -109,28 +111,36 @@ for (let i = 0; i < 400; i += 1) {
   const body = await page.locator('body').innerText();
   if (body.includes('の かち！')) break;
 
-  if (body.includes('テラスタル できる')) {
-    const who = await currentPlayer();
-    // あいての チーム も べつ枠で 1回 つかえる。おなじ人に 2回 きいたら だめ
-    if (teraUsedBy.has(who)) { askedAgain = true; await page.getByText('いまは しない').click(); continue; }
-    if (who !== 'p1') { await page.getByText('いまは しない').click(); continue; }
-    sawPrompt = true;
-    await shot('60-tera-prompt');
-    await page.locator('.tera-pick__btn').first().click();
-    await page.waitForTimeout(700);
-    await shot('61-tera-gather');
-    await page.waitForTimeout(900);
-    teraCutIn = await page.locator('.tera-cutin').count();
-    await shot('62-tera-reveal');
-    await page.waitForTimeout(900);
-    teraCards = await page.locator('.card--tera').count();
-    teraUsedBy.add(who);
-    continue;
-  }
+  // おしていないのに えらぶ画面が 出ていたら だめ（まえは 毎ターン 出ていた）
+  if (body.includes('だれを テラスタル する')) { promptedWithoutTap = true; }
+
   if (body.includes('スマホを わたしてね')) { await page.getByText('じゅんび できた').click(); continue; }
   if (body.includes('つかれてるよ')) { await page.getByText('これで いく').click(); continue; }
   if (body.includes('メガシンカ できる！')) { await page.getByText('いまは しない').click(); continue; }
   if (body.includes('だれで こうげきする')) {
+    const who = await currentPlayer();
+    const teraButton = page.getByText('テラスタル する', { exact: false });
+    if (await teraButton.count()) {
+      sawButton = true;
+      // あいての チーム も べつ枠で 1回 つかえる。おなじ人に 2回 出たら だめ
+      if (teraUsedBy.has(who)) { askedAgain = true; }
+      if (who === 'p1') {
+        await shot('59-tera-button');
+        await teraButton.click();
+        sawPrompt = true;
+        await shot('60-tera-prompt');
+        await page.locator('.tera-pick__btn').first().click();
+        await page.waitForTimeout(700);
+        await shot('61-tera-gather');
+        await page.waitForTimeout(900);
+        teraCutIn = await page.locator('.tera-cutin').count();
+        await shot('62-tera-reveal');
+        await page.waitForTimeout(900);
+        teraCards = await page.locator('.card--tera').count();
+        teraUsedBy.add(who);
+        continue;
+      }
+    }
     // テラスタルした子（かげに けっしょう）が いれば その子で
     const tera = page.locator('[data-role=attacker] .card--tera.card--selectable');
     if (await tera.count()) await tera.first().click({ force: true });
@@ -191,7 +201,7 @@ const evenlySplit =
   dealt !== null && Math.max(...dealt) - Math.min(...dealt) <= 20;
 
 const summary = {
-  sawPrompt, teraCutIn, teraCards, normalCycle, teraCycle,
+  sawButton, sawPrompt, promptedWithoutTap, teraCutIn, teraCards, normalCycle, teraCycle,
   slower: normalCycle && teraCycle ? teraCycle / normalCycle : null,
   hpBefore, hpAfter, dealt, hitAll, evenlySplit, askedAgain, overflow, errors,
 };
@@ -199,7 +209,9 @@ console.log(JSON.stringify(summary, null, 2));
 await browser.close();
 
 const ok =
+  sawButton &&
   sawPrompt &&
+  !promptedWithoutTap &&        // おしていないのに 出てこない
   teraCutIn > 0 &&              // せんよう カットイン が出た
   teraCards > 0 &&              // かげ に けっしょう が ついた
   teraCycle !== null && normalCycle !== null &&

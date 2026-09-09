@@ -15,7 +15,7 @@ export type BattlePhase =
   | 'megaPrompt'
   /** メガシンカ の演出中 */
   | 'megaEvolving'
-  /** テラスタル できる。だれを テラスタル させるか えらぶ */
+  /** 💎 ボタンを おした。だれを テラスタル させるか えらぶ */
   | 'teraPrompt'
   /** テラスタル の演出中 */
   | 'teraChanging'
@@ -86,7 +86,7 @@ export interface BattleState {
   selectedMove: MoveKind | null;
   /** メガシンカ できる自分のポケモン。いなければ null */
   megaCandidateIndex: number | null;
-  /** いま「だれを テラスタル する？」と 聞いているか（§3.11） */
+  /** テラスタル が まだ つかえるか（＝💎 ボタンを出すか・§3.11） */
   teraOffer: boolean;
   /** テラスタル は チームに 1回だけ。つかったら true */
   teraUsed: Record<PlayerId, boolean>;
@@ -100,9 +100,11 @@ export type BattleAction =
   | { type: 'megaEvolve' }
   /** いまは メガシンカ しない。このターンは もう聞かない */
   | { type: 'declineMega' }
+  /** 💎 ボタンを おした。だれを テラスタル させるか えらぶ画面へ */
+  | { type: 'openTeraPrompt' }
   /** その子を テラスタル させる */
   | { type: 'terastallize'; index: number }
-  /** いまは テラスタル しない。このターンは もう聞かない */
+  /** えらぶのを やめる。ボタンは のこるので あとで また ひらける */
   | { type: 'declineTera' }
   | { type: 'selectAttacker'; index: number }
   | { type: 'selectTarget'; index: number }
@@ -141,13 +143,13 @@ export function createBattle(
   firstPlayer: PlayerId,
   settings: Settings,
 ): BattleState {
-  // 1ターン目からも テラスタル を えらべるようにする（§3.11）
+  // 1ターン目から 💎 ボタンを 出す（§3.11）
   const teraOffer = settings.attackStyle === 'timing';
   return {
     teams: { p1: p1.map(toBattlePokemon), p2: p2.map(toBattlePokemon) },
     turnPlayer: firstPlayer,
     turnCount: 1,
-    phase: teraOffer ? 'teraPrompt' : 'selectAttacker',
+    phase: 'selectAttacker',
     selectedAttackerIndex: null,
     selectedTargetIndex: null,
     selectedMove: null,
@@ -260,7 +262,11 @@ function startTurn(state: BattleState, turnPlayer: PlayerId): BattleState {
   if (state.settings.fatigueEnabled) clearFatigueIfAlone(teams[turnPlayer]);
 
   const megaCandidateIndex = findMegaCandidateIndex(teams[turnPlayer], state.settings);
-  // テラスタル は チームに 1回だけ。まだ つかっていなければ 毎ターン 聞く（§3.11）
+  /*
+   * テラスタル は チームに 1回だけ。まだ つかっていなければ 💎 ボタンを出す。
+   * まえは 毎ターン モーダルで 聞いていたが、ほとんどの ターンは つかわないので
+   * じゃま だった。**聞かれる のではなく、つかいたいとき に おす**形にした（§3.11）。
+   */
   const teraOffer =
     !state.teraUsed[turnPlayer] &&
     state.settings.attackStyle === 'timing' &&
@@ -270,8 +276,7 @@ function startTurn(state: BattleState, turnPlayer: PlayerId): BattleState {
     ...state,
     teams,
     turnPlayer,
-    phase:
-      megaCandidateIndex !== null ? 'megaPrompt' : teraOffer ? 'teraPrompt' : 'selectAttacker',
+    phase: megaCandidateIndex === null ? 'selectAttacker' : 'megaPrompt',
     megaCandidateIndex,
     teraOffer,
     selectedAttackerIndex: null,
@@ -293,13 +298,15 @@ export function battleReducer(state: BattleState, action: BattleAction): BattleS
 
     case 'declineMega': {
       if (state.phase !== 'megaPrompt') return state;
-      // 断ったら、このターンはもう聞かない（次のターンにまた聞く）。
-      // つづけて テラスタル を 聞く
-      return {
-        ...state,
-        phase: state.teraOffer ? 'teraPrompt' : 'selectAttacker',
-        megaCandidateIndex: null,
-      };
+      // 断ったら、このターンはもう聞かない（次のターンにまた聞く）
+      return { ...state, phase: 'selectAttacker', megaCandidateIndex: null };
+    }
+
+    case 'openTeraPrompt': {
+      // 💎 ボタン は こうげきする子を えらぶ ところ にだけ 出す
+      if (state.phase !== 'selectAttacker' || !state.teraOffer) return state;
+      if (state.teraUsed[state.turnPlayer]) return state;
+      return { ...state, phase: 'teraPrompt' };
     }
 
     case 'terastallize': {
@@ -319,8 +326,8 @@ export function battleReducer(state: BattleState, action: BattleAction): BattleS
 
     case 'declineTera': {
       if (state.phase !== 'teraPrompt') return state;
-      // 断ったら、このターンはもう聞かない（次のターンにまた聞く）
-      return { ...state, phase: 'selectAttacker', teraOffer: false };
+      // とじるだけ。💎 ボタンは のこるので あとで また ひらける
+      return { ...state, phase: 'selectAttacker' };
     }
 
     case 'selectAttacker': {
