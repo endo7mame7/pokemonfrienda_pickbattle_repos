@@ -19,20 +19,41 @@ export function SelectTeamScreen({
 }: Props) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
+  const byId = (id: string) => picks.find((pick) => pick.id === id);
+  const megaCount = (ids: string[]) => ids.filter((id) => byId(id)?.canMegaEvolve).length;
+
+  /**
+   * メガシンカ できる子は チームに 1たい まで（docs/SPEC.md §3.2）。
+   * ただし ずかん の中みによっては この きまり だと チームが組めないので、
+   * 組めるときだけ ルールを かける。
+   */
+  const megaLimitActive = picks.filter((pick) => !pick.canMegaEvolve).length + 1 >= size;
+  const megaFull = megaLimitActive && megaCount(selectedIds) >= 1;
+
+  /** そのピックが いま えらべない理由。null なら えらべる */
+  const blockedReason = (pick: Pick): string | null => {
+    if (selectedIds.includes(pick.id)) return null; // えらんだものは いつでも はずせる
+    if (megaFull && pick.canMegaEvolve) return 'メガシンカ は 1たい だけ';
+    if (selectedIds.length >= size) return 'もう いっぱい';
+    return null;
+  };
+
   // 同じピックを2回選べないようにする（相手とは同じでもよい）
-  const toggle = (id: string) => {
-    setSelectedIds((current) => {
-      if (current.includes(id)) return current.filter((x) => x !== id);
-      if (current.length >= size) return current;
-      return [...current, id];
-    });
+  const toggle = (pick: Pick) => {
+    if (blockedReason(pick)) return;
+    setSelectedIds((current) =>
+      current.includes(pick.id)
+        ? current.filter((x) => x !== pick.id)
+        : [...current, pick.id],
+    );
   };
 
   const done = selectedIds.length === size;
 
-  // まえの編成が いまも ずかんに そろっているときだけ出す
+  // まえの編成が いまも ずかんに そろっていて、メガシンカ の きまり も まもれるときだけ出す
   const repeatable = (lastTeam ?? []).filter((id) => picks.some((pick) => pick.id === id));
-  const canRepeat = repeatable.length === size;
+  const canRepeat =
+    repeatable.length === size && (!megaLimitActive || megaCount(repeatable) <= 1);
 
   return (
     <div className="screen">
@@ -43,6 +64,9 @@ export function SelectTeamScreen({
         <p className="subtitle">
           {size}たい えらんでね（あと {size - selectedIds.length}たい）
         </p>
+        {megaLimitActive && (
+          <p className="subtitle subtitle--rule">🌈 メガシンカ できる子は 1たい だけ</p>
+        )}
 
         {canRepeat && selectedIds.length === 0 && (
           <button
@@ -57,12 +81,21 @@ export function SelectTeamScreen({
         <div className="pick-grid">
           {picks.map((pick) => {
             const order = selectedIds.indexOf(pick.id);
+            const blocked = blockedReason(pick);
+            const megaBlocked = blocked === 'メガシンカ は 1たい だけ';
             return (
               <button
                 key={pick.id}
                 type="button"
-                className={order >= 0 ? 'pick-item pick-item--selected' : 'pick-item'}
-                onClick={() => toggle(pick.id)}
+                className={[
+                  'pick-item',
+                  order >= 0 ? 'pick-item--selected' : '',
+                  blocked ? 'pick-item--blocked' : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+                aria-disabled={blocked !== null}
+                onClick={() => toggle(pick)}
               >
                 <div className="pick-item__inner">
                   <Silhouette
@@ -77,6 +110,7 @@ export function SelectTeamScreen({
                   </div>
                   <div className="card__hp-text">{pick.energy}</div>
                   {pick.canMegaEvolve && <div style={{ fontSize: 13 }}>🌈 メガシンカ</div>}
+                  {megaBlocked && <div className="pick-item__note">1たい だけ</div>}
                   {order >= 0 && <div className="pick-item__order">{order + 1}</div>}
                 </div>
               </button>

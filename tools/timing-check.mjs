@@ -32,12 +32,12 @@ await page.getByText('みほんの 12たいを いれる').click();
 await page.getByText('もどる').click();
 await page.locator('.mode').first().click();
 await page.getByText(`${SIZE}たい${SIZE}`).click();
-for (const n of ['リザードン', 'ピカチュウ', 'カメックス'].slice(0, SIZE)) {
+for (const n of ['リザードン', 'ピカチュウ', 'カビゴン'].slice(0, SIZE)) {
   await page.getByText(n, { exact: true }).click();
 }
 await page.getByText('けってい').click();
 await page.getByText('じゅんび できた').click();
-for (const n of ['フシギバナ', 'ゲンガー', 'ギャラドス'].slice(0, SIZE)) {
+for (const n of ['フシギバナ', 'ミミッキュ', 'ハガネール'].slice(0, SIZE)) {
   await page.getByText(n, { exact: true }).click();
 }
 await page.getByText('けってい').click();

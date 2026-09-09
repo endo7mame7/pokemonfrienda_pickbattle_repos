@@ -120,6 +120,12 @@ body {
   margin: 0;
 }
 
+/* えらびかたの きまり。ふつうの せつめい より すこし めだたせる */
+.subtitle--rule {
+  font-weight: 700;
+  color: #5b3fbf;
+}
+
 .message {
   text-align: center;
   font-size: 21px;
@@ -486,6 +492,23 @@ body {
   background: #eaf2fd;
 }
 
+/* いま えらべない ピック。おしても なにも おきない */
+.pick-item--blocked {
+  opacity: 0.42;
+  filter: grayscale(0.7);
+}
+
+.pick-item__note {
+  display: inline-block;
+  margin-top: 2px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #ffe0e0;
+  color: #b3261e;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .pick-item__order {
   display: inline-block;
   min-width: 24px;
@@ -640,11 +663,260 @@ body {
   }
 }
 
+
+/* --- メガシンカ せんよう の カットイン（docs/SPEC.md §3.10） --- */
+.mega-cutin {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* ななめに はしる にじいろ の おび */
+.mega-cutin__band {
+  position: absolute;
+  left: -20%;
+  right: -20%;
+  height: 42%;
+  top: 22%;
+  background: linear-gradient(90deg, #b06bd8, #e0417a, #ffd24a);
+  opacity: 0.9;
+  transform: skewY(-8deg) translateX(-130%);
+  animation: mega-cutin-band 1400ms cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
+}
+
+.mega-cutin__band--2 {
+  top: 34%;
+  height: 26%;
+  background: linear-gradient(90deg, #ffd24a, #a8e6ff, #b06bd8);
+  animation-delay: 90ms;
+}
+
+@keyframes mega-cutin-band {
+  0% { transform: skewY(-8deg) translateX(-130%); }
+  25% { transform: skewY(-8deg) translateX(0); }
+  60% { transform: skewY(-8deg) translateX(0); }
+  100% { transform: skewY(-8deg) translateX(130%); }
+}
+
+/* まわりから まんなかへ あつまる ひかり */
+.mega-cutin__rays {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mega-cutin__ray {
+  position: absolute;
+  width: 6px;
+  height: 120px;
+  border-radius: 999px;
+  background: linear-gradient(#fff, rgba(255, 255, 255, 0));
+  transform: rotate(var(--ray)) translateY(-320px);
+  animation: mega-cutin-ray 620ms ease-in infinite;
+}
+
+@keyframes mega-cutin-ray {
+  0% { transform: rotate(var(--ray)) translateY(-320px); opacity: 0; }
+  30% { opacity: 1; }
+  100% { transform: rotate(var(--ray)) translateY(-90px); opacity: 0; }
+}
+
+/* かげ の ばしょ。大きさを きめておき、文字と かさならないようにする */
+.mega-cutin__stage {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 210px;
+  height: 210px;
+}
+
+/* お ひろめ のときに まわる にじいろ の わ */
+.mega-cutin__halo {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(#ffd1f4, #d9c6ff, #a8e6ff, #ffe9a8, #ffd1f4);
+  animation: spin 2.4s linear infinite;
+}
+
+.mega-cutin__halo::after {
+  content: '';
+  position: absolute;
+  inset: 16px;
+  border-radius: 50%;
+  background: rgba(20, 30, 45, 0.92);
+}
+
+.mega-cutin__figure {
+  position: relative;
+  z-index: 1;
+  color: #fff;
+  filter: drop-shadow(0 8px 20px rgba(0, 0, 0, 0.5));
+}
+
+/* かげ は 白ぬき。おびの うえでも 見える */
+.mega-cutin__figure svg {
+  color: #fff !important;
+}
+
+/* ためている あいだ は ふるえる */
+.mega-cutin--charge .mega-cutin__figure {
+  animation: mega-cutin-shake 140ms linear infinite;
+}
+
+@keyframes mega-cutin-shake {
+  0%, 100% { transform: translate(-3px, 0) scale(1); }
+  50% { transform: translate(3px, -2px) scale(1.03); }
+}
+
+/* はじけた あと は ぐんと 大きくなって おちつく */
+.mega-cutin--reveal .mega-cutin__figure {
+  animation: mega-cutin-pop 700ms cubic-bezier(0.2, 1.5, 0.4, 1);
+}
+
+@keyframes mega-cutin-pop {
+  0% { transform: scale(0.5) rotate(-8deg); opacity: 0.2; }
+  60% { transform: scale(1.18) rotate(3deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0deg); }
+}
+
+.mega-cutin__flash {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 50%, #fff 0%, #fff 40%, rgba(255, 255, 255, 0) 72%);
+  animation: mega-cutin-flash 700ms ease-out forwards;
+}
+
+@keyframes mega-cutin-flash {
+  0% { opacity: 0; transform: scale(0.3); }
+  25% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.6); }
+}
+
+.mega-cutin__words {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  animation: pop 400ms ease-out both;
+}
+
+.mega-cutin__title {
+  font-size: 32px;
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 2px 10px rgba(140, 60, 200, 0.9);
+}
+
+.mega-cutin__name {
+  font-size: 24px;
+  font-weight: 900;
+  color: #ffe08a;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+}
+
+.mega-cutin__caption {
+  font-size: 17px;
+  font-weight: 700;
+  color: #fff;
+}
+
+/* --- メガシンカ が とける ときの エフェクト --- */
+.mega-end {
+  position: absolute;
+  left: var(--fx-from-x);
+  top: var(--fx-from-y);
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+/* オーラ が しぼんで きえる。カードの うえで はっきり見えるよう 少し大きめ */
+.mega-end__glow {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 190px;
+  height: 190px;
+  margin: -95px 0 0 -95px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(201, 164, 255, 0.75) 0%, rgba(201, 164, 255, 0) 68%);
+  animation: mega-end-glow 900ms ease-out forwards;
+}
+
+@keyframes mega-end-glow {
+  0% { transform: scale(1.15); opacity: 0.9; }
+  100% { transform: scale(0.3); opacity: 0; }
+}
+
+.mega-end__ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 176px;
+  height: 176px;
+  margin: -88px 0 0 -88px;
+  border-radius: 50%;
+  border: 7px solid #c9a4ff;
+  animation: mega-end-ring 900ms ease-out forwards;
+}
+
+.mega-end__ring--2 {
+  animation-delay: 160ms;
+  border-color: #ffd24a;
+}
+
+@keyframes mega-end-ring {
+  0% { transform: scale(1.3); opacity: 0; }
+  20% { opacity: 1; }
+  100% { transform: scale(0.12); opacity: 0; }
+}
+
+/* オーラが かけらに なって おちていく */
+.mega-end__shard {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border-radius: 3px;
+  background: #b98cff;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.9);
+  transform: rotate(var(--shard)) translateY(-78px);
+  animation: mega-end-shard 1000ms ease-in forwards;
+}
+
+@keyframes mega-end-shard {
+  0% { transform: rotate(var(--shard)) translateY(-78px) scale(1.15); opacity: 1; }
+  100% { transform: rotate(var(--shard)) translateY(-6px) scale(0.2); opacity: 0; }
+}
+
+
 /* 動きを減らす設定の端末では、点滅させない */
 @media (prefers-reduced-motion: reduce) {
   .mega-stage__glow,
   .mega-stage__figure,
   .mega-flash,
+  .mega-cutin__band,
+  .mega-cutin__ray,
+  .mega-cutin__halo,
+  .mega-cutin__figure,
+  .mega-cutin__flash,
+  .mega-end__glow,
+  .mega-end__ring,
+  .mega-end__shard,
   .card--selectable,
   .dice-button,
   .die--rolling,

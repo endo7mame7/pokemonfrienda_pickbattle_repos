@@ -52,6 +52,8 @@ let sawMegaMove = false;
 let mashFill = null;
 let megaAuraInCard = 0;
 let damageBox = null;          // ダメージの数が 画面に おさまっているか
+let megaCutInShown = 0;        // メガシンカ せんよう の カットイン
+let megaEndFxShown = null;     // メガシンカ が とける ときの エフェクト
 let sawMegaEnded = false;      // 「メガシンカ が とけた」の ひょうじ
 let megaCardsAfter = null;     // メガわざ の あと、かげ が もどっているか
 
@@ -66,9 +68,13 @@ for (let i = 0; i < 400 && mashFill === null; i += 1) {
     sawPrompt = true;
     await shot('40-mega-prompt');
     await page.getByText('メガシンカ する！').click();
-    await page.waitForTimeout(1500);
-    await shot('41-mega-animation');
-    await page.waitForTimeout(1200);
+    await page.waitForTimeout(600);
+    await shot('41a-mega-charge');    // ひかりを ためている ところ
+    await page.waitForTimeout(900);
+    await shot('41b-mega-reveal');    // すがたが かわった ところ
+    // せんよう カットイン が 出ているか
+    megaCutInShown = await page.locator('.mega-cutin').count();
+    await page.waitForTimeout(1100);
     // カードの かげ が つよそうな すがた に変わっているか
     megaAuraInCard = await page.locator('.card--mega svg polygon').count();
     await shot('42-mega-card');
@@ -141,6 +147,7 @@ for (let i = 0; i < 400 && mashFill === null; i += 1) {
       // メガわざ を うつと ちからを つかいきって もとの すがた に もどる
       sawMegaEnded = body.includes('メガシンカ が とけた');
       megaCardsAfter = await page.locator('.card--mega').count();
+      megaEndFxShown = await page.locator('.mega-end__ring').count();
       await shot('48-mash-result');
     }
     await page.locator('.battle-center').click({ force: true });
@@ -159,7 +166,7 @@ const damageFits =
   damageBox.left >= 0 && damageBox.top >= 0 &&
   damageBox.right <= 375 && damageBox.bottom <= 667;
 
-const summary = { sawPrompt, sawMegaMove, megaAuraInCard, mashResult: mashFill, sawMegaEnded, megaCardsAfter, damageBox, damageFits, overflow, errors };
+const summary = { sawPrompt, megaCutInShown, megaEndFxShown, sawMegaMove, megaAuraInCard, mashResult: mashFill, sawMegaEnded, megaCardsAfter, damageBox, damageFits, overflow, errors };
 console.log(JSON.stringify(summary, null, 2));
 await browser.close();
 
@@ -167,7 +174,9 @@ const ok =
   sawPrompt && sawMegaMove &&
   megaAuraInCard > 0 &&          // かげが つよそうな すがた に変わっている
   mashFill !== null &&           // れんだ の結果が出た
+  megaCutInShown > 0 &&          // メガシンカ せんよう の カットイン が出る
   sawMegaEnded &&                // メガシンカ が とけた と出る
+  megaEndFxShown > 0 &&          // とける エフェクト が出る
   damageFits &&                  // ダメージの数が 見切れていない
   megaCardsAfter === 0 &&        // かげ が もとに もどっている
   overflow.x === 0 && overflow.y === 0 &&

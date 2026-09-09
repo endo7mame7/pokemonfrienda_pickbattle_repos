@@ -1,5 +1,7 @@
 import { useEffect, useLayoutEffect, useReducer, useRef, useState } from 'react';
 import { AttackAnimation } from '../components/AttackAnimation';
+import { MegaEndEffect } from '../components/MegaEndEffect';
+import { MegaEvolveCutIn } from '../components/MegaEvolveCutIn';
 import { MashGauge } from '../components/MashGauge';
 import { TimingGauge } from '../components/TimingGauge';
 import type { AttackPath } from '../components/AttackAnimation';
@@ -381,6 +383,11 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
             stage={state.phase === 'resolve' ? 'damage' : stage}
           />
         )}
+
+        {/* メガわざ で ちからを つかいきった。オーラが とけていく */}
+        {path && result?.megaEnded && state.phase === 'resolve' && (
+          <MegaEndEffect key={`mega-end-${state.turnCount}`} path={path} />
+        )}
       </div>
 
       {tiredConfirmIndex !== null && (
@@ -450,26 +457,17 @@ export function BattleScreen({ p1, p2, firstPlayer, settings, playerNames, onFin
 
       {state.phase === 'megaEvolving' && megaCandidate && (
         <div className="overlay">
-          <div className="mega-stage">
-            <div className="mega-stage__glow">
-              <div className="mega-stage__figure">
-                <Silhouette
-                  name={megaCandidate.name}
-                  type={megaCandidate.type}
-                  shape={megaCandidate.silhouette}
-                  mega
-                  size={110}
-                />
-              </div>
-            </div>
-            <div className="mega-stage__title">🌈 メガシンカ！</div>
-            <div className="tap-hint" style={{ color: '#fff' }}>
-              {settings.attackStyle === 'timing'
-                ? `${megaCandidate.name}が つよくなった！`
-                : `${megaCandidate.name}の サイコロが 2こに なった！`}
-            </div>
-          </div>
-          <div className="mega-flash" />
+          <MegaEvolveCutIn
+            key={`mega-cutin-${state.turnCount}-${megaCandidate.pickId}`}
+            name={megaCandidate.name}
+            type={megaCandidate.type}
+            shape={megaCandidate.silhouette}
+            caption={
+              settings.attackStyle === 'timing'
+                ? 'ちからが あふれだした！'
+                : 'サイコロが 2こに なった！'
+            }
+          />
         </div>
       )}
 
