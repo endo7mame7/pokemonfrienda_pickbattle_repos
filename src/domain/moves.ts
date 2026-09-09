@@ -16,7 +16,7 @@ export type TimingMoveKind = Exclude<MoveKind, 'mega'>;
  */
 export const MOVE_POWER: Record<MoveKind, number> = {
   /** まんなかで とめたときの ちから。なだらかな カーブ なので 平均は これより かなり低い */
-  normal: 100,
+  normal: 130,
   /** とがった カーブ。ねらえたときだけ 大きく、外すと 0（docs/SPEC.md §3.4.1） */
   strong: 300,
   /** メガわざ。ねらう必要がないぶん、最大でも つよいわざ の ぴったり には とどかない */
