@@ -1427,8 +1427,9 @@ body {
   width: 8px;
   margin-left: -4px;
   border-radius: 4px;
-  background: var(--ink);
-  box-shadow: 0 0 8px rgba(0, 0, 0, 0.45);
+  /* きいろ。うすい段のうえ でも、くろい 0ダメージ帯 のうえ でも 見える */
+  background: #ffd21e;
+  box-shadow: 0 0 0 2px #22262e, 0 0 10px rgba(0, 0, 0, 0.5);
 }
 
 .gauge__hint {
